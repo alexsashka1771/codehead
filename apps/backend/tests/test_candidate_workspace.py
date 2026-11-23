@@ -1,0 +1,176 @@
+import hashlib
+import importlib
+import json
+from datetime import UTC, datetime
+from pathlib import Path
+from uuid import uuid4
+
+import pytest
+
+from codehead.clinic.files import InvalidFile, tree_hash
+from codehead.contracts import CandidateFileView, CandidateView
+
+MODULE_PATH = Path(__file__).resolve().parents[1] / "src/codehead/clinic/workspace.py"
+
+
+def workspace_module():
+    assert MODULE_PATH.is_file(), "Immutable candidate materialization is missing"
+    return importlib.import_module("codehead.clinic.workspace")
+
+
+def descriptor(files=None):
+    contents = files or {"backend/clinic_api.py": "# fixture\n"}
+    stamp = datetime.now(UTC)
+    views = [
+        CandidateFileView(
+            relative_path=path,
+            artifact_id=str(uuid4()),
+            version=1,
+            content_hash=hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            byte_size=len(content.encode("utf-8")),
+            media_type="text/plain",
+            origin="test_injected",
+            source="test",
+        )
+        for path, content in sorted(contents.items())
+    ]
+    candidate = CandidateView(
+        id=str(uuid4()),
+        run_id=str(uuid4()),
+        revision=3,
+        status="materializing",
+        profile_version="clinic_demo/v1",
+        profile_hash="a" * 64,
+        acceptance_suite_hash="b" * 64,
+        template_hash="c" * 64,
+        tree_hash=tree_hash({view.relative_path: view.content_hash for view in views}),
+        manifest_artifact_id=str(uuid4()),
+        files=views,
+        created_at=stamp,
+        updated_at=stamp,
+    )
+    manifest = (
+        json.dumps(
+            {
+                "candidate_id": candidate.id,
+                "run_id": candidate.run_id,
+                "revision": candidate.revision,
+                "profile_version": candidate.profile_version,
+                "profile_hash": candidate.profile_hash,
+                "acceptance_suite_hash": candidate.acceptance_suite_hash,
+                "template_hash": candidate.template_hash,
+                "tree_hash": candidate.tree_hash,
+                "normalization_version": "utf8-lf-v1",
+                "files": [view.model_dump(mode="json") for view in views],
+            }
+        )
+        + "\n"
+    )
+    candidate = candidate.model_copy(
+        update={
+            "manifest_hash": hashlib.sha256(manifest.encode("utf-8")).hexdigest(),
+            "manifest_byte_size": len(manifest.encode("utf-8")),
+        }
+    )
+    return candidate, contents, manifest
+
+
+def test_materialization_writes_verified_files_and_the_immutable_manifest(tmp_path):
+    candidate, contents, manifest = descriptor()
+    path = workspace_module().materialize(tmp_path, candidate, contents, manifest)
+    assert path == tmp_path / candidate.id / "v3"
+    assert (path / "backend/clinic_api.py").read_bytes() == b"# fixture\n"
+    assert (path / ".codehead/manifest.json").read_text(encoding="utf-8") == manifest
+
+
+def test_materialization_is_idempotent_without_rewriting_existing_sources(tmp_path):
+    candidate, contents, manifest = descriptor()
+    module = workspace_module()
+    path = module.materialize(tmp_path, candidate, contents, manifest)
+    before = (path / "backend/clinic_api.py").stat().st_mtime_ns
+    assert module.materialize(tmp_path, candidate, contents, manifest) == path
+    assert (path / "backend/clinic_api.py").stat().st_mtime_ns == before
+
+
+def test_hash_mismatch_is_detected_before_any_directory_is_created(tmp_path):
+    candidate, contents, manifest = descriptor()
+    contents["backend/clinic_api.py"] = "changed\n"
+    with pytest.raises(InvalidFile):
+        workspace_module().materialize(tmp_path, candidate, contents, manifest)
+    assert not (tmp_path / candidate.id).exists()
+
+
+def test_changed_workspace_file_is_preserved_and_refused(tmp_path):
+    candidate, contents, manifest = descriptor()
+    module = workspace_module()
+    path = module.materialize(tmp_path, candidate, contents, manifest)
+    file = path / "backend/clinic_api.py"
+    file.write_text("human change\n", encoding="utf-8")
+    with pytest.raises(InvalidFile):
+        module.materialize(tmp_path, candidate, contents, manifest)
+    assert file.read_text(encoding="utf-8") == "human change\n"
+
+
+def test_double_bom_change_to_existing_source_cannot_bypass_hash_verification(tmp_path):
+    candidate, contents, manifest = descriptor()
+    module = workspace_module()
+    path = module.materialize(tmp_path, candidate, contents, manifest)
+    file = path / "backend/clinic_api.py"
+    changed = b"\xef\xbb\xbf\xef\xbb\xbf# fixture\n"
+    file.write_bytes(changed)
+    with pytest.raises(InvalidFile):
+        module.materialize(tmp_path, candidate, contents, manifest)
+    assert file.read_bytes() == changed
+
+
+def test_normalized_leading_feff_content_survives_materialization(tmp_path):
+    candidate, contents, manifest = descriptor({"backend/clinic_api.py": "\ufeffprint(1)\n"})
+    module = workspace_module()
+    path = module.materialize(tmp_path, candidate, contents, manifest)
+    assert (path / "backend/clinic_api.py").read_bytes() == b"\xef\xbb\xbf\xef\xbb\xbfprint(1)\n"
+    assert module.materialize(tmp_path, candidate, contents, manifest) == path
+
+
+def test_changed_serialization_of_committed_manifest_is_refused(tmp_path):
+    candidate, contents, manifest = descriptor()
+    rewritten = json.dumps(json.loads(manifest), indent=2) + "\n"
+    assert rewritten != manifest
+    with pytest.raises(InvalidFile):
+        workspace_module().materialize(tmp_path, candidate, contents, rewritten)
+    assert not (tmp_path / candidate.id).exists()
+
+
+def test_missing_content_refuses_a_partial_workspace(tmp_path):
+    candidate, _, manifest = descriptor()
+    with pytest.raises(InvalidFile):
+        workspace_module().materialize(tmp_path, candidate, {}, manifest)
+    assert not (tmp_path / candidate.id).exists()
+
+
+def test_untracked_source_does_not_get_overwritten_or_ignored(tmp_path):
+    candidate, contents, manifest = descriptor()
+    path = tmp_path / candidate.id / "v3/backend"
+    path.mkdir(parents=True)
+    extra = path / "untracked.py"
+    extra.write_text("human code\n", encoding="utf-8")
+    with pytest.raises(InvalidFile):
+        workspace_module().materialize(tmp_path, candidate, contents, manifest)
+    assert extra.read_text(encoding="utf-8") == "human code\n"
+    assert not (path / "clinic_api.py").exists()
+
+
+@pytest.mark.parametrize("identifier", ["../outside", "C:/outside", "not-a-uuid"])
+def test_candidate_identifier_cannot_be_used_as_a_path_escape(tmp_path, identifier):
+    candidate, contents, manifest = descriptor()
+    candidate = candidate.model_copy(update={"id": identifier})
+    with pytest.raises(InvalidFile):
+        workspace_module().materialize(tmp_path, candidate, contents, manifest)
+
+
+def test_manifest_content_must_describe_the_committed_candidate(tmp_path):
+    candidate, contents, manifest = descriptor()
+    value = json.loads(manifest)
+    value["revision"] = 99
+    with pytest.raises(InvalidFile):
+        workspace_module().materialize(tmp_path, candidate, contents, json.dumps(value))
+    assert not (tmp_path / candidate.id).exists()

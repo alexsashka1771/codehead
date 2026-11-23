@@ -1,0 +1,697 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-22T14:55:39.775476Z",
+  "title": "Design System: CodeHead",
+  "extensions": {
+    "colorMeta": {
+      "bg": {
+        "role": "neutral",
+        "displayName": "Графитовый фон",
+        "tonalRamp": [
+          "oklch(15% 0.0246 259.26)",
+          "oklch(25% 0.0246 259.26)",
+          "oklch(35% 0.0246 259.26)",
+          "oklch(45% 0.0246 259.26)",
+          "oklch(55% 0.0246 259.26)",
+          "oklch(65% 0.0246 259.26)",
+          "oklch(80% 0.0246 259.26)",
+          "oklch(95% 0.0246 259.26)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Графитовая панель",
+        "tonalRamp": [
+          "oklch(15% 0.0321 258.31)",
+          "oklch(25% 0.0321 258.31)",
+          "oklch(35% 0.0321 258.31)",
+          "oklch(45% 0.0321 258.31)",
+          "oklch(55% 0.0321 258.31)",
+          "oklch(65% 0.0321 258.31)",
+          "oklch(80% 0.0321 258.31)",
+          "oklch(95% 0.0321 258.31)"
+        ]
+      },
+      "surface-elevated": {
+        "role": "neutral",
+        "displayName": "Поднятая поверхность",
+        "tonalRamp": [
+          "oklch(15% 0.0381 255.03)",
+          "oklch(25% 0.0381 255.03)",
+          "oklch(35% 0.0381 255.03)",
+          "oklch(45% 0.0381 255.03)",
+          "oklch(55% 0.0381 255.03)",
+          "oklch(65% 0.0381 255.03)",
+          "oklch(80% 0.0381 255.03)",
+          "oklch(95% 0.0381 255.03)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Светлые чернила",
+        "tonalRamp": [
+          "oklch(15% 0.0154 257.20)",
+          "oklch(25% 0.0154 257.20)",
+          "oklch(35% 0.0154 257.20)",
+          "oklch(45% 0.0154 257.20)",
+          "oklch(55% 0.0154 257.20)",
+          "oklch(65% 0.0154 257.20)",
+          "oklch(80% 0.0154 257.20)",
+          "oklch(95% 0.0154 257.20)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Приглушённый текст",
+        "tonalRamp": [
+          "oklch(15% 0.0338 254.04)",
+          "oklch(25% 0.0338 254.04)",
+          "oklch(35% 0.0338 254.04)",
+          "oklch(45% 0.0338 254.04)",
+          "oklch(55% 0.0338 254.04)",
+          "oklch(65% 0.0338 254.04)",
+          "oklch(80% 0.0338 254.04)",
+          "oklch(95% 0.0338 254.04)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Разделитель",
+        "tonalRamp": [
+          "oklch(15% 0.0366 253.30)",
+          "oklch(25% 0.0366 253.30)",
+          "oklch(35% 0.0366 253.30)",
+          "oklch(45% 0.0366 253.30)",
+          "oklch(55% 0.0366 253.30)",
+          "oklch(65% 0.0366 253.30)",
+          "oklch(80% 0.0366 253.30)",
+          "oklch(95% 0.0366 253.30)"
+        ]
+      },
+      "soft": {
+        "role": "neutral",
+        "displayName": "Мягкий вложенный слой",
+        "tonalRamp": [
+          "oklch(15% 0.0408 257.30)",
+          "oklch(25% 0.0408 257.30)",
+          "oklch(35% 0.0408 257.30)",
+          "oklch(45% 0.0408 257.30)",
+          "oklch(55% 0.0408 257.30)",
+          "oklch(65% 0.0408 257.30)",
+          "oklch(80% 0.0408 257.30)",
+          "oklch(95% 0.0408 257.30)"
+        ]
+      },
+      "blue": {
+        "role": "primary",
+        "displayName": "Электрический голубой",
+        "tonalRamp": [
+          "oklch(15% 0.1440 234.61)",
+          "oklch(25% 0.1440 234.61)",
+          "oklch(35% 0.1440 234.61)",
+          "oklch(45% 0.1440 234.61)",
+          "oklch(55% 0.1440 234.61)",
+          "oklch(65% 0.1440 234.61)",
+          "oklch(80% 0.1440 234.61)",
+          "oklch(95% 0.1440 234.61)"
+        ]
+      },
+      "blue-bg": {
+        "role": "primary",
+        "displayName": "Подложка выбора",
+        "tonalRamp": [
+          "oklch(15% 0.0535 244.13)",
+          "oklch(25% 0.0535 244.13)",
+          "oklch(35% 0.0535 244.13)",
+          "oklch(45% 0.0535 244.13)",
+          "oklch(55% 0.0535 244.13)",
+          "oklch(65% 0.0535 244.13)",
+          "oklch(80% 0.0535 244.13)",
+          "oklch(95% 0.0535 244.13)"
+        ]
+      },
+      "blue-ink": {
+        "role": "primary",
+        "displayName": "Текст выбора",
+        "tonalRamp": [
+          "oklch(15% 0.0768 229.97)",
+          "oklch(25% 0.0768 229.97)",
+          "oklch(35% 0.0768 229.97)",
+          "oklch(45% 0.0768 229.97)",
+          "oklch(55% 0.0768 229.97)",
+          "oklch(65% 0.0768 229.97)",
+          "oklch(80% 0.0768 229.97)",
+          "oklch(95% 0.0768 229.97)"
+        ]
+      },
+      "amber": {
+        "role": "secondary",
+        "displayName": "Командный оранжевый",
+        "tonalRamp": [
+          "oklch(15% 0.1467 54.60)",
+          "oklch(25% 0.1467 54.60)",
+          "oklch(35% 0.1467 54.60)",
+          "oklch(45% 0.1467 54.60)",
+          "oklch(55% 0.1467 54.60)",
+          "oklch(65% 0.1467 54.60)",
+          "oklch(80% 0.1467 54.60)",
+          "oklch(95% 0.1467 54.60)"
+        ]
+      },
+      "amber-dim": {
+        "role": "secondary",
+        "displayName": "Светлый оранжевый",
+        "tonalRamp": [
+          "oklch(15% 0.0972 60.42)",
+          "oklch(25% 0.0972 60.42)",
+          "oklch(35% 0.0972 60.42)",
+          "oklch(45% 0.0972 60.42)",
+          "oklch(55% 0.0972 60.42)",
+          "oklch(65% 0.0972 60.42)",
+          "oklch(80% 0.0972 60.42)",
+          "oklch(95% 0.0972 60.42)"
+        ]
+      },
+      "danger": {
+        "role": "error",
+        "displayName": "Ошибка",
+        "tonalRamp": [
+          "oklch(15% 0.1006 19.45)",
+          "oklch(25% 0.1006 19.45)",
+          "oklch(35% 0.1006 19.45)",
+          "oklch(45% 0.1006 19.45)",
+          "oklch(55% 0.1006 19.45)",
+          "oklch(65% 0.1006 19.45)",
+          "oklch(80% 0.1006 19.45)",
+          "oklch(95% 0.1006 19.45)"
+        ]
+      },
+      "danger-bg": {
+        "role": "error",
+        "displayName": "Подложка ошибки",
+        "tonalRamp": [
+          "oklch(15% 0.0397 7.07)",
+          "oklch(25% 0.0397 7.07)",
+          "oklch(35% 0.0397 7.07)",
+          "oklch(45% 0.0397 7.07)",
+          "oklch(55% 0.0397 7.07)",
+          "oklch(65% 0.0397 7.07)",
+          "oklch(80% 0.0397 7.07)",
+          "oklch(95% 0.0397 7.07)"
+        ]
+      },
+      "success": {
+        "role": "success",
+        "displayName": "Подтверждённый результат",
+        "tonalRamp": [
+          "oklch(15% 0.0965 163.98)",
+          "oklch(25% 0.0965 163.98)",
+          "oklch(35% 0.0965 163.98)",
+          "oklch(45% 0.0965 163.98)",
+          "oklch(55% 0.0965 163.98)",
+          "oklch(65% 0.0965 163.98)",
+          "oklch(80% 0.0965 163.98)",
+          "oklch(95% 0.0965 163.98)"
+        ]
+      },
+      "day-bg": {
+        "role": "neutral",
+        "displayName": "Графитовый фон · день",
+        "tonalRamp": [
+          "oklch(15% 0.0120 247.95)",
+          "oklch(25% 0.0120 247.95)",
+          "oklch(35% 0.0120 247.95)",
+          "oklch(45% 0.0120 247.95)",
+          "oklch(55% 0.0120 247.95)",
+          "oklch(65% 0.0120 247.95)",
+          "oklch(80% 0.0120 247.95)",
+          "oklch(95% 0.0120 247.95)"
+        ]
+      },
+      "day-surface": {
+        "role": "neutral",
+        "displayName": "Графитовая панель · день",
+        "tonalRamp": [
+          "oklch(15% 0.0029 264.54)",
+          "oklch(25% 0.0029 264.54)",
+          "oklch(35% 0.0029 264.54)",
+          "oklch(45% 0.0029 264.54)",
+          "oklch(55% 0.0029 264.54)",
+          "oklch(65% 0.0029 264.54)",
+          "oklch(80% 0.0029 264.54)",
+          "oklch(95% 0.0029 264.54)"
+        ]
+      },
+      "day-surface-elevated": {
+        "role": "neutral",
+        "displayName": "Поднятая поверхность · день",
+        "tonalRamp": [
+          "oklch(15% 0.0103 247.93)",
+          "oklch(25% 0.0103 247.93)",
+          "oklch(35% 0.0103 247.93)",
+          "oklch(45% 0.0103 247.93)",
+          "oklch(55% 0.0103 247.93)",
+          "oklch(65% 0.0103 247.93)",
+          "oklch(80% 0.0103 247.93)",
+          "oklch(95% 0.0103 247.93)"
+        ]
+      },
+      "day-ink": {
+        "role": "neutral",
+        "displayName": "Светлые чернила · день",
+        "tonalRamp": [
+          "oklch(15% 0.0397 253.64)",
+          "oklch(25% 0.0397 253.64)",
+          "oklch(35% 0.0397 253.64)",
+          "oklch(45% 0.0397 253.64)",
+          "oklch(55% 0.0397 253.64)",
+          "oklch(65% 0.0397 253.64)",
+          "oklch(80% 0.0397 253.64)",
+          "oklch(95% 0.0397 253.64)"
+        ]
+      },
+      "day-muted": {
+        "role": "neutral",
+        "displayName": "Приглушённый текст · день",
+        "tonalRamp": [
+          "oklch(15% 0.0421 252.36)",
+          "oklch(25% 0.0421 252.36)",
+          "oklch(35% 0.0421 252.36)",
+          "oklch(45% 0.0421 252.36)",
+          "oklch(55% 0.0421 252.36)",
+          "oklch(65% 0.0421 252.36)",
+          "oklch(80% 0.0421 252.36)",
+          "oklch(95% 0.0421 252.36)"
+        ]
+      },
+      "day-line": {
+        "role": "neutral",
+        "displayName": "Разделитель · день",
+        "tonalRamp": [
+          "oklch(15% 0.0223 250.24)",
+          "oklch(25% 0.0223 250.24)",
+          "oklch(35% 0.0223 250.24)",
+          "oklch(45% 0.0223 250.24)",
+          "oklch(55% 0.0223 250.24)",
+          "oklch(65% 0.0223 250.24)",
+          "oklch(80% 0.0223 250.24)",
+          "oklch(95% 0.0223 250.24)"
+        ]
+      },
+      "day-soft": {
+        "role": "neutral",
+        "displayName": "Мягкий вложенный слой · день",
+        "tonalRamp": [
+          "oklch(15% 0.0131 251.56)",
+          "oklch(25% 0.0131 251.56)",
+          "oklch(35% 0.0131 251.56)",
+          "oklch(45% 0.0131 251.56)",
+          "oklch(55% 0.0131 251.56)",
+          "oklch(65% 0.0131 251.56)",
+          "oklch(80% 0.0131 251.56)",
+          "oklch(95% 0.0131 251.56)"
+        ]
+      },
+      "day-blue": {
+        "role": "primary",
+        "displayName": "Электрический голубой · день",
+        "tonalRamp": [
+          "oklch(15% 0.1200 238.03)",
+          "oklch(25% 0.1200 238.03)",
+          "oklch(35% 0.1200 238.03)",
+          "oklch(45% 0.1200 238.03)",
+          "oklch(55% 0.1200 238.03)",
+          "oklch(65% 0.1200 238.03)",
+          "oklch(80% 0.1200 238.03)",
+          "oklch(95% 0.1200 238.03)"
+        ]
+      },
+      "day-blue-bg": {
+        "role": "primary",
+        "displayName": "Подложка выбора · день",
+        "tonalRamp": [
+          "oklch(15% 0.0260 227.90)",
+          "oklch(25% 0.0260 227.90)",
+          "oklch(35% 0.0260 227.90)",
+          "oklch(45% 0.0260 227.90)",
+          "oklch(55% 0.0260 227.90)",
+          "oklch(65% 0.0260 227.90)",
+          "oklch(80% 0.0260 227.90)",
+          "oklch(95% 0.0260 227.90)"
+        ]
+      },
+      "day-blue-ink": {
+        "role": "primary",
+        "displayName": "Текст выбора · день",
+        "tonalRamp": [
+          "oklch(15% 0.0982 237.63)",
+          "oklch(25% 0.0982 237.63)",
+          "oklch(35% 0.0982 237.63)",
+          "oklch(45% 0.0982 237.63)",
+          "oklch(55% 0.0982 237.63)",
+          "oklch(65% 0.0982 237.63)",
+          "oklch(80% 0.0982 237.63)",
+          "oklch(95% 0.0982 237.63)"
+        ]
+      },
+      "day-amber": {
+        "role": "secondary",
+        "displayName": "Командный оранжевый · день",
+        "tonalRamp": [
+          "oklch(15% 0.1520 53.49)",
+          "oklch(25% 0.1520 53.49)",
+          "oklch(35% 0.1520 53.49)",
+          "oklch(45% 0.1520 53.49)",
+          "oklch(55% 0.1520 53.49)",
+          "oklch(65% 0.1520 53.49)",
+          "oklch(80% 0.1520 53.49)",
+          "oklch(95% 0.1520 53.49)"
+        ]
+      },
+      "day-amber-dim": {
+        "role": "secondary",
+        "displayName": "Светлый оранжевый · день",
+        "tonalRamp": [
+          "oklch(15% 0.1356 47.78)",
+          "oklch(25% 0.1356 47.78)",
+          "oklch(35% 0.1356 47.78)",
+          "oklch(45% 0.1356 47.78)",
+          "oklch(55% 0.1356 47.78)",
+          "oklch(65% 0.1356 47.78)",
+          "oklch(80% 0.1356 47.78)",
+          "oklch(95% 0.1356 47.78)"
+        ]
+      },
+      "day-danger": {
+        "role": "error",
+        "displayName": "Ошибка · день",
+        "tonalRamp": [
+          "oklch(15% 0.1574 17.75)",
+          "oklch(25% 0.1574 17.75)",
+          "oklch(35% 0.1574 17.75)",
+          "oklch(45% 0.1574 17.75)",
+          "oklch(55% 0.1574 17.75)",
+          "oklch(65% 0.1574 17.75)",
+          "oklch(80% 0.1574 17.75)",
+          "oklch(95% 0.1574 17.75)"
+        ]
+      },
+      "day-danger-bg": {
+        "role": "error",
+        "displayName": "Подложка ошибки · день",
+        "tonalRamp": [
+          "oklch(15% 0.0163 12.78)",
+          "oklch(25% 0.0163 12.78)",
+          "oklch(35% 0.0163 12.78)",
+          "oklch(45% 0.0163 12.78)",
+          "oklch(55% 0.0163 12.78)",
+          "oklch(65% 0.0163 12.78)",
+          "oklch(80% 0.0163 12.78)",
+          "oklch(95% 0.0163 12.78)"
+        ]
+      },
+      "day-success": {
+        "role": "success",
+        "displayName": "Подтверждённый результат · день",
+        "tonalRamp": [
+          "oklch(15% 0.0912 164.07)",
+          "oklch(25% 0.0912 164.07)",
+          "oklch(35% 0.0912 164.07)",
+          "oklch(45% 0.0912 164.07)",
+          "oklch(55% 0.0912 164.07)",
+          "oklch(65% 0.0912 164.07)",
+          "oklch(80% 0.0912 164.07)",
+          "oklch(95% 0.0912 164.07)"
+        ]
+      },
+      "factory-ground": {
+        "role": "neutral",
+        "displayName": "Фон процедурного мира",
+        "tonalRamp": [
+          "oklch(15% 0.0231 254.31)",
+          "oklch(25% 0.0231 254.31)",
+          "oklch(35% 0.0231 254.31)",
+          "oklch(45% 0.0231 254.31)",
+          "oklch(55% 0.0231 254.31)",
+          "oklch(65% 0.0231 254.31)",
+          "oklch(80% 0.0231 254.31)",
+          "oklch(95% 0.0231 254.31)"
+        ]
+      },
+      "day-factory-ground": {
+        "role": "neutral",
+        "displayName": "Фон процедурного мира · день",
+        "tonalRamp": [
+          "oklch(15% 0.0171 242.45)",
+          "oklch(25% 0.0171 242.45)",
+          "oklch(35% 0.0171 242.45)",
+          "oklch(45% 0.0171 242.45)",
+          "oklch(55% 0.0171 242.45)",
+          "oklch(65% 0.0171 242.45)",
+          "oklch(80% 0.0171 242.45)",
+          "oklch(95% 0.0171 242.45)"
+        ]
+      },
+      "factory-blue": {
+        "role": "primary",
+        "displayName": "Голубое оборудование",
+        "tonalRamp": [
+          "oklch(15% 0.1449 227.73)",
+          "oklch(25% 0.1449 227.73)",
+          "oklch(35% 0.1449 227.73)",
+          "oklch(45% 0.1449 227.73)",
+          "oklch(55% 0.1449 227.73)",
+          "oklch(65% 0.1449 227.73)",
+          "oklch(80% 0.1449 227.73)",
+          "oklch(95% 0.1449 227.73)"
+        ]
+      },
+      "factory-orange": {
+        "role": "secondary",
+        "displayName": "Оранжевое оборудование",
+        "tonalRamp": [
+          "oklch(15% 0.1542 58.49)",
+          "oklch(25% 0.1542 58.49)",
+          "oklch(35% 0.1542 58.49)",
+          "oklch(45% 0.1542 58.49)",
+          "oklch(55% 0.1542 58.49)",
+          "oklch(65% 0.1542 58.49)",
+          "oklch(80% 0.1542 58.49)",
+          "oklch(95% 0.1542 58.49)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Рабочий заголовок",
+        "purpose": "Название текущего пространства."
+      },
+      "role-title": {
+        "displayName": "Имя роли",
+        "purpose": "Заголовок карточки выбранного робота."
+      },
+      "title": {
+        "displayName": "Заголовок панели",
+        "purpose": "Повторяющиеся названия разделов."
+      },
+      "body": {
+        "displayName": "Основной текст",
+        "purpose": "Описание проекта и поддерживающий текст."
+      },
+      "data": {
+        "displayName": "Данные",
+        "purpose": "Таблица очереди и плотные пояснения."
+      },
+      "label": {
+        "displayName": "Статус",
+        "purpose": "Краткое состояние и местоположение."
+      },
+      "action": {
+        "displayName": "Действие",
+        "purpose": "Подпись основных и вторичных команд."
+      },
+      "field": {
+        "displayName": "Поле",
+        "purpose": "Ввод имени и описания проекта."
+      }
+    },
+    "shadows": [
+      {
+        "name": "small",
+        "value": "0 5px 16px #03070e3d",
+        "purpose": "Ночная тема: инструменты, док, камера и подсказки."
+      },
+      {
+        "name": "large",
+        "value": "0 14px 40px #02060d70",
+        "purpose": "Ночная тема: открытые панели."
+      },
+      {
+        "name": "day-small",
+        "value": "0 5px 16px #23385314",
+        "purpose": "Дневная тема: компактные плавающие группы."
+      },
+      {
+        "name": "day-large",
+        "value": "0 14px 40px #23385326",
+        "purpose": "Дневная тема: открытые панели."
+      }
+    ],
+    "motion": [
+      {
+        "name": "standard-ease",
+        "value": "cubic-bezier(.2, .8, .2, 1)",
+        "purpose": "Общая кривая CSS-переходов."
+      },
+      {
+        "name": "control-state",
+        "value": "140ms",
+        "purpose": "Изменение фона и цвета управляющих кнопок."
+      },
+      {
+        "name": "panel-enter",
+        "value": "180ms",
+        "purpose": "Короткое появление боковой панели; CSS reduced motion отключает его."
+      },
+      {
+        "name": "tooltip-hover-bridge",
+        "value": "140ms",
+        "purpose": "Задержка скрытия при переходе указателя с маркера в подсказку; не анимация сцены."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-desktop",
+        "value": "1150px"
+      },
+      {
+        "name": "compact-toolbar",
+        "value": "850px"
+      },
+      {
+        "name": "mobile-sheets",
+        "value": "720px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Основная кнопка",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Оранжевая команда создания или запуска.",
+      "html": "<button type=\"button\" class=\"ds-button ds-primary\">Создать проект</button>",
+      "css": ".ds-button{min-height:38px;display:inline-flex;justify-content:center;align-items:center;gap:7px;padding:9px 12px;border:0;border-radius:8px;font:650 13px/1.4 Manrope,sans-serif;cursor:pointer;transition:background 140ms var(--ease,cubic-bezier(.2,.8,.2,1))}.ds-button:focus-visible{outline:2px solid var(--blue,#39bfff);outline-offset:3px}.ds-button:disabled{cursor:not-allowed;opacity:.5}@media(prefers-reduced-motion:reduce){.ds-button{transition:none}}.ds-primary{background:var(--amber,#ff9c54);color:#281b11}.ds-primary:hover:not(:disabled){background:#ffb277}"
+    },
+    {
+      "name": "Вторичная кнопка",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Управление сохраняемым процессом.",
+      "html": "<button type=\"button\" class=\"ds-button ds-secondary\">Приостановить</button>",
+      "css": ".ds-button{min-height:38px;display:inline-flex;justify-content:center;align-items:center;gap:7px;padding:9px 12px;border:0;border-radius:8px;font:650 13px/1.4 Manrope,sans-serif;cursor:pointer;transition:background 140ms var(--ease,cubic-bezier(.2,.8,.2,1))}.ds-button:focus-visible{outline:2px solid var(--blue,#39bfff);outline-offset:3px}.ds-button:disabled{cursor:not-allowed;opacity:.5}@media(prefers-reduced-motion:reduce){.ds-button{transition:none}}.ds-secondary{background:var(--soft,#243246);color:var(--ink,#e6edf7)}.ds-secondary:hover:not(:disabled){background:var(--surface-elevated,#202e40)}"
+    },
+    {
+      "name": "Текстовая кнопка",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "Компактное вспомогательное действие.",
+      "html": "<button type=\"button\" class=\"ds-button ds-text\">Обновить</button>",
+      "css": ".ds-button{min-height:38px;display:inline-flex;justify-content:center;align-items:center;gap:7px;padding:9px 12px;border:0;border-radius:8px;font:650 13px/1.4 Manrope,sans-serif;cursor:pointer;transition:background 140ms var(--ease,cubic-bezier(.2,.8,.2,1))}.ds-button:focus-visible{outline:2px solid var(--blue,#39bfff);outline-offset:3px}.ds-button:disabled{cursor:not-allowed;opacity:.5}@media(prefers-reduced-motion:reduce){.ds-button{transition:none}}.ds-text{background:transparent;color:var(--muted,#a4b4c8);padding:8px}.ds-text:hover:not(:disabled){color:var(--ink,#e6edf7);background:var(--soft,#243246)}"
+    },
+    {
+      "name": "Поле проекта",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Поле имени в одноколоночной форме.",
+      "html": "<div class=\"ds-field\"><label for=\"ds-project-name\">Название проекта</label><input id=\"ds-project-name\" type=\"text\" placeholder=\"Название проекта\"/></div>",
+      "css": ".ds-field{font-family:Manrope,sans-serif;color:var(--ink,#e6edf7)}.ds-field label{display:block;font-size:13px;font-weight:600;margin:18px 0 8px}.ds-field input{width:100%;min-width:0;padding:11px 12px;font:400 13px/1.6 Manrope,sans-serif;color:var(--ink,#e6edf7);background:var(--surface-elevated,#202e40);border:1px solid var(--line,#344355);border-radius:8px;caret-color:var(--blue,#39bfff)}.ds-field input::placeholder{color:var(--muted,#a4b4c8);opacity:1}.ds-field input:focus-visible{outline:2px solid var(--blue,#39bfff);outline-offset:3px}"
+    },
+    {
+      "name": "Инструменты панелей",
+      "kind": "nav",
+      "refersTo": "tool-button",
+      "description": "Компактная вертикальная группа открывает одну панель.",
+      "html": "<nav class=\"ds-tools\" aria-label=\"Панели фабрики\"><button type=\"button\" class=\"ds-tool ds-tool-active\" aria-label=\"Управление проектом\" aria-expanded=\"true\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M9 3v18\"/></svg></button><button type=\"button\" class=\"ds-tool\" aria-label=\"Карточка выбранной роли\" aria-expanded=\"false\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 8V4H8\"/><rect width=\"16\" height=\"12\" x=\"4\" y=\"8\" rx=\"2\"/><path d=\"M2 14h2m16 0h2M9 13v2m6-2v2\"/></svg></button></nav>",
+      "css": ".ds-tools{display:inline-flex;flex-direction:column;gap:3px;padding:5px;background:var(--surface,#182231);border-radius:13px;box-shadow:var(--shadow-sm,0 5px 16px #03070e3d)}.ds-tool{width:38px;height:40px;display:grid;place-items:center;border:0;border-radius:8px;background:transparent;color:var(--muted,#a4b4c8);cursor:pointer;transition:background 140ms var(--ease,cubic-bezier(.2,.8,.2,1)),color 140ms var(--ease,cubic-bezier(.2,.8,.2,1))}.ds-tool:hover{background:var(--soft,#243246);color:var(--ink,#e6edf7)}.ds-tool.ds-tool-active{background:var(--blue-bg,#203d54);color:var(--blue-ink,#a1e0ff)}.ds-tool:focus-visible{outline:2px solid var(--blue,#39bfff);outline-offset:3px}@media(prefers-reduced-motion:reduce){.ds-tool{transition:none}}"
+    },
+    {
+      "name": "Метка профиля",
+      "kind": "chip",
+      "refersTo": "profile-tag",
+      "description": "Спокойная голубая метка Clinic Demo.",
+      "html": "<span class=\"ds-profile-tag\">Clinic Demo</span>",
+      "css": ".ds-profile-tag{display:inline-block;color:var(--blue-ink,#a1e0ff);background:var(--blue-bg,#203d54);padding:5px 8px;border-radius:6px;font-family:Manrope,sans-serif;font-size:10px;font-weight:650}"
+    },
+    {
+      "name": "Карточка состояния",
+      "kind": "card",
+      "refersTo": "status-card",
+      "description": "Вложенная тональная поверхность сохраняемого процесса.",
+      "html": "<div class=\"ds-status\"><div><strong>Ожидает worker</strong><p>Исполнение задач ещё не подключено.</p></div></div>",
+      "css": ".ds-status{display:flex;gap:11px;align-items:flex-start;background:var(--soft,#243246);color:var(--ink,#e6edf7);padding:13px;border-radius:12px;font-family:Manrope,sans-serif}.ds-status strong{display:block;font-size:13px;line-height:1.5;font-weight:650}.ds-status p{font-size:12px;color:var(--muted,#a4b4c8);line-height:1.65;margin:6px 0 0}"
+    },
+    {
+      "name": "Контейнер панели",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Непрозрачная панель с отдельным заголовком.",
+      "html": "<section class=\"ds-panel\"><header class=\"ds-panel-heading\"><h2>Управление проектом</h2><button type=\"button\" class=\"ds-close\" aria-label=\"Скрыть управление\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m18 6-12 12M6 6l12 12\"/></svg></button></header><div class=\"ds-panel-body\">Сохраняемый проект.</div></section>",
+      "css": ".ds-panel{width:330px;max-width:100%;display:flex;flex-direction:column;border-radius:16px;background:var(--surface,#182231);color:var(--ink,#e6edf7);box-shadow:var(--shadow-lg,0 14px 40px #02060d70);overflow:hidden;font:400 13px/1.7 Manrope,sans-serif}.ds-panel-heading{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px 12px 20px;border-bottom:1px solid var(--line,#344355)}.ds-panel-heading h2{margin:0;font-size:14px;font-weight:650}.ds-panel-body{min-height:0;padding:20px;overflow:auto}.ds-close{width:34px;height:34px;display:grid;place-items:center;padding:0;border:0;border-radius:8px;background:transparent;color:var(--muted,#a4b4c8);cursor:pointer}.ds-close:hover{background:var(--soft,#243246);color:var(--ink,#e6edf7)}.ds-close:focus-visible{outline:2px solid var(--blue,#39bfff);outline-offset:3px}"
+    },
+    {
+      "name": "Выбранная роль",
+      "kind": "custom",
+      "refersTo": "role-button-selected",
+      "description": "SVG-силуэт, краткая метка и голубой выбор в доке.",
+      "html": "<button type=\"button\" class=\"ds-role ds-role-selected\" aria-label=\"Product Manager\" aria-pressed=\"true\"><span class=\"ds-role-mark\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect width=\"20\" height=\"14\" x=\"2\" y=\"7\" rx=\"2\"/><path d=\"M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16\"/></svg></span><span class=\"ds-role-short\">PM</span><span class=\"ds-state-dot\" aria-hidden=\"true\"></span></button>",
+      "css": ".ds-role{position:relative;width:48px;height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0;border:0;border-radius:9px;background:transparent;color:var(--muted,#a4b4c8);font-family:Manrope,sans-serif;cursor:pointer;transition:background 140ms var(--ease,cubic-bezier(.2,.8,.2,1)),color 140ms var(--ease,cubic-bezier(.2,.8,.2,1))}.ds-role:hover{background:var(--soft,#243246);color:var(--ink,#e6edf7)}.ds-role.ds-role-selected{background:var(--blue-bg,#203d54);color:var(--blue-ink,#a1e0ff)}.ds-role-mark{width:27px;height:27px;display:grid;place-items:center;color:#ff9c54}.ds-role-mark svg{width:22px;height:22px}.ds-role-short{font-size:9px;font-weight:650;letter-spacing:.02em;line-height:1}.ds-state-dot{position:absolute;right:7px;top:7px;width:4px;height:4px;border-radius:50%;background:var(--muted,#a4b4c8)}.ds-role:focus-visible{outline:2px solid var(--blue,#39bfff);outline-offset:3px}@media(prefers-reduced-motion:reduce){.ds-role{transition:none}}:host-context([data-theme='day']) .ds-role-mark{color:var(--blue-ink,#055d86)}"
+    },
+    {
+      "name": "Подсказка зоны",
+      "kind": "custom",
+      "refersTo": "tooltip",
+      "description": "Читаемые название, роли и состояние выбранного маркера.",
+      "html": "<div class=\"ds-zone-tooltip\" role=\"tooltip\"><span class=\"ds-tooltip-name\">Product</span><span class=\"ds-tooltip-role\">Product Manager</span><span class=\"ds-tooltip-status\">Offline</span></div>",
+      "css": ".ds-zone-tooltip{max-width:min(220px,calc(100vw - 30px));display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:10px;color:var(--ink,#e6edf7);background:var(--surface-elevated,#202e40);box-shadow:var(--shadow-sm,0 5px 16px #03070e3d);font:400 11px/1.5 Manrope,sans-serif}.ds-tooltip-name{color:var(--ink,#e6edf7);font-size:13px;font-weight:650}.ds-tooltip-role,.ds-tooltip-status{color:var(--muted,#a4b4c8);font-size:10px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Ночной центр управления фабрикой",
+    "overview": "Графитовая оболочка окружает собственную изометрическую фабрику: открытые комнаты, металлические корпуса, голубые экраны, тёплые столы и оранжевые детали. Интерфейс компактный; выразительность принадлежит оборудованию и семи различимым роботам. Основная тема ночная, дневная сохраняет тот же мир и геометрию.\n\nДокумент фиксирует реализованную визуальную систему маршрута /. Выбор автора закреплён в [согласованном направлении](../../docs/UI_REDESIGN_DESIGN.md); функциональные требования остаются в [TECHNICAL_SPEC.md, R13](../../docs/TECHNICAL_SPEC.md#r13). Текущая процедурная версия относится к курсовому этапу. Художественный пилот, Blender-ресурсы и измерения дипломной версии проверяются отдельно.",
+    "keyCharacteristics": [
+      "Связанные объёмные студии, управляемая камера и компактная HTML-оболочка.",
+      "Два акцента, непрозрачные панели, свет от оборудования.",
+      "Детали по запросу, клавиатура и сохранение контекста.",
+      "Семь оригинальных моделей SkinnedMesh с суставами и клипами, внешний вид выбирается через appearance_id.",
+      "Цветные матовые комнаты, крупные деревянные доски, мягкие отражения и прозрачные объёмные оболочки Core."
+    ],
+    "rules": [
+      {
+        "name": "Two Accents",
+        "body": "Голубой обозначает выбор и навигацию; оранжевый выделяет основную команду, выбранную зону и тёплые детали оборудования.",
+        "section": "colors"
+      },
+      {
+        "name": "Compact Hierarchy",
+        "body": "Иерархию создают размер, вес и расстояние; интерфейс сохраняет один шрифт и обычный регистр текста.",
+        "section": "typography"
+      },
+      {
+        "name": "Equipment Light",
+        "body": "Свечение принадлежит экранам, оборудованию и границам выбранной зоны. HTML-панели остаются непрозрачными и отделяются тоном и мягкой тенью.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do сохранять семантику голубого и оранжевого при переключении темы.",
+      "Do давать полный смысл состояния текстом и SVG-значком, сохранять клавиатуру и HTML-управление.",
+      "Do оставлять на фабрике компактные маркеры и раскрывать подробности по запросу."
+    ],
+    "donts": [
+      "Don't возвращать постоянный слой полных имён над всеми зонами и роботами.",
+      "Don't изображать работу неподключённого worker или подменять неизвестные расходы нулём.",
+      "Don't заменять выбираемую процедурную фабрику растровым изображением."
+    ]
+  }
+}

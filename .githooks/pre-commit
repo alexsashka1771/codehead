@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+if [ -x .venv/Scripts/python.exe ]; then
+  .venv/Scripts/python.exe -X utf8 tools/git_guard.py
+else
+  python -X utf8 tools/git_guard.py
+fi
+git diff --cached --check

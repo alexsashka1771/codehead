@@ -1,0 +1,2909 @@
+{
+  "$defs": {
+    "AgentRunView": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "number": {
+          "minimum": 1,
+          "title": "Number",
+          "type": "integer"
+        },
+        "fencing_token": {
+          "minimum": 1,
+          "title": "Fencing Token",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "created",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "uncertain"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model"
+        },
+        "input_versions": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Input Versions",
+          "type": "object"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "title": "Parameters",
+          "type": "object"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Started At"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Finished At"
+        },
+        "provider_request_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Provider Request Id"
+        },
+        "stop_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Stop Reason"
+        },
+        "input_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Input Tokens"
+        },
+        "output_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Output Tokens"
+        },
+        "cost_usd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cost Usd"
+        },
+        "latency_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Latency Ms"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error Code"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error Message"
+        },
+        "retry_of_attempt_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Retry Of Attempt Id"
+        },
+        "decision_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Decision Id"
+        },
+        "trace_available": {
+          "title": "Trace Available",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "run_id",
+        "task_id",
+        "agent_id",
+        "number",
+        "fencing_token",
+        "status",
+        "provider",
+        "model",
+        "input_versions",
+        "parameters",
+        "created_at",
+        "started_at",
+        "finished_at",
+        "provider_request_id",
+        "stop_reason",
+        "input_tokens",
+        "output_tokens",
+        "cost_usd",
+        "latency_ms",
+        "error_code",
+        "error_message",
+        "retry_of_attempt_id",
+        "decision_id",
+        "trace_available"
+      ],
+      "title": "AgentRunView",
+      "type": "object"
+    },
+    "AgentView": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/Role"
+        },
+        "instructions_version": {
+          "title": "Instructions Version",
+          "type": "string"
+        },
+        "appearance_id": {
+          "title": "Appearance Id",
+          "type": "string"
+        },
+        "lifecycle": {
+          "enum": [
+            "idle",
+            "busy",
+            "blocked",
+            "offline",
+            "failed"
+          ],
+          "title": "Lifecycle",
+          "type": "string"
+        },
+        "activity": {
+          "anyOf": [
+            {
+              "enum": [
+                "planning",
+                "analyzing",
+                "coding",
+                "testing",
+                "reviewing",
+                "building",
+                "meeting",
+                "waiting"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Activity"
+        },
+        "location": {
+          "$ref": "#/$defs/Location"
+        },
+        "current_task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Current Task Id"
+        },
+        "allowed_operations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Operations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "run_id",
+        "role",
+        "instructions_version",
+        "appearance_id",
+        "lifecycle",
+        "activity",
+        "location",
+        "current_task_id"
+      ],
+      "title": "AgentView",
+      "type": "object"
+    },
+    "ApiProblem": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "correlation_id": {
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "retriable": {
+          "title": "Retriable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "correlation_id",
+        "retriable"
+      ],
+      "title": "ApiProblem",
+      "type": "object"
+    },
+    "ArtifactContent": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "media_type": {
+          "title": "Media Type",
+          "type": "string"
+        },
+        "byte_size": {
+          "minimum": 0,
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "content_hash",
+        "media_type",
+        "byte_size",
+        "content"
+      ],
+      "title": "ArtifactContent",
+      "type": "object"
+    },
+    "ArtifactProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "origin": {
+          "default": "unclassified",
+          "enum": [
+            "user",
+            "template",
+            "llm",
+            "tool",
+            "test",
+            "unclassified"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "producer_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Producer Id"
+        },
+        "parent_artifact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Artifact Id"
+        }
+      },
+      "title": "ArtifactProvenance",
+      "type": "object"
+    },
+    "ArtifactView": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Task Id"
+        },
+        "artifact_type": {
+          "title": "Artifact Type",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "relative_path": {
+          "title": "Relative Path",
+          "type": "string"
+        },
+        "author_role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Role"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "input_versions": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Input Versions",
+          "type": "object"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/ArtifactProvenance"
+        },
+        "media_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Media Type"
+        },
+        "byte_size": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Byte Size"
+        }
+      },
+      "required": [
+        "id",
+        "run_id",
+        "task_id",
+        "artifact_type",
+        "version",
+        "content_hash",
+        "relative_path",
+        "author_role",
+        "input_versions",
+        "created_at"
+      ],
+      "title": "ArtifactView",
+      "type": "object"
+    },
+    "AttemptTrace": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt_id": {
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Prompt"
+        },
+        "raw_response": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Raw Response"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "title": "Parameters",
+          "type": "object"
+        },
+        "input_versions": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Input Versions",
+          "type": "object"
+        },
+        "stop_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Stop Reason"
+        },
+        "redaction_version": {
+          "title": "Redaction Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attempt_id",
+        "prompt",
+        "raw_response",
+        "parameters",
+        "input_versions",
+        "stop_reason",
+        "redaction_version"
+      ],
+      "title": "AttemptTrace",
+      "type": "object"
+    },
+    "CandidateFileView": {
+      "additionalProperties": false,
+      "properties": {
+        "relative_path": {
+          "title": "Relative Path",
+          "type": "string"
+        },
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "media_type": {
+          "title": "Media Type",
+          "type": "string"
+        },
+        "byte_size": {
+          "minimum": 0,
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "origin": {
+          "enum": [
+            "template",
+            "generated",
+            "human",
+            "test_injected"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "template",
+            "live",
+            "human",
+            "test"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "producer_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Producer Id"
+        },
+        "producer_role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Role"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "parent_artifact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Artifact Id"
+        },
+        "parent_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Hash"
+        },
+        "input_versions": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Input Versions",
+          "type": "object"
+        },
+        "normalization_version": {
+          "const": "utf8-lf-v1",
+          "default": "utf8-lf-v1",
+          "title": "Normalization Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "relative_path",
+        "artifact_id",
+        "version",
+        "content_hash",
+        "media_type",
+        "byte_size",
+        "origin",
+        "source"
+      ],
+      "title": "CandidateFileView",
+      "type": "object"
+    },
+    "CandidateView": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "assembling",
+            "materializing",
+            "ready",
+            "conflict",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "profile_version": {
+          "title": "Profile Version",
+          "type": "string"
+        },
+        "profile_hash": {
+          "title": "Profile Hash",
+          "type": "string"
+        },
+        "acceptance_suite_hash": {
+          "title": "Acceptance Suite Hash",
+          "type": "string"
+        },
+        "template_hash": {
+          "title": "Template Hash",
+          "type": "string"
+        },
+        "tree_hash": {
+          "title": "Tree Hash",
+          "type": "string"
+        },
+        "manifest_artifact_id": {
+          "title": "Manifest Artifact Id",
+          "type": "string"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/CandidateFileView"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "workspace_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workspace Path"
+        },
+        "blocked_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Blocked Reason"
+        },
+        "manifest_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Manifest Hash"
+        },
+        "manifest_byte_size": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Manifest Byte Size"
+        }
+      },
+      "required": [
+        "id",
+        "run_id",
+        "revision",
+        "status",
+        "profile_version",
+        "profile_hash",
+        "acceptance_suite_hash",
+        "template_hash",
+        "tree_hash",
+        "manifest_artifact_id",
+        "files",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "CandidateView",
+      "type": "object"
+    },
+    "CapabilitiesResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "stage": {
+          "default": "foundation",
+          "enum": [
+            "foundation",
+            "worker"
+          ],
+          "title": "Stage",
+          "type": "string"
+        },
+        "capabilities": {
+          "items": {
+            "$ref": "#/$defs/Capability"
+          },
+          "title": "Capabilities",
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "$ref": "#/$defs/RoleDefinition"
+          },
+          "title": "Roles",
+          "type": "array"
+        }
+      },
+      "required": [
+        "capabilities",
+        "roles"
+      ],
+      "title": "CapabilitiesResponse",
+      "type": "object"
+    },
+    "Capability": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "available",
+            "planned",
+            "disabled",
+            "degraded"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "reason"
+      ],
+      "title": "Capability",
+      "type": "object"
+    },
+    "CommandReceiptView": {
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "params_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Params Hash",
+          "type": "string"
+        },
+        "response": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProjectView"
+            },
+            {
+              "$ref": "#/$defs/RunView"
+            }
+          ],
+          "title": "Response"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "key",
+        "params_hash",
+        "response",
+        "created_at"
+      ],
+      "title": "CommandReceiptView",
+      "type": "object"
+    },
+    "CreateProject": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "^[^\\x00]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 8000,
+          "minLength": 10,
+          "pattern": "^[^\\x00]*$",
+          "title": "Description",
+          "type": "string"
+        },
+        "profile": {
+          "const": "clinic_demo",
+          "default": "clinic_demo",
+          "title": "Profile",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description"
+      ],
+      "title": "CreateProject",
+      "type": "object"
+    },
+    "DecisionResolution": {
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "choice": {
+          "enum": [
+            "approve",
+            "reject",
+            "confirm_failed",
+            "retry_with_risk"
+          ],
+          "title": "Choice",
+          "type": "string"
+        },
+        "comment": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Comment",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "choice"
+      ],
+      "title": "DecisionResolution",
+      "type": "object"
+    },
+    "DecisionView": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "attempt_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Attempt Id"
+        },
+        "kind": {
+          "enum": [
+            "architecture_approval",
+            "uncertain_outcome"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "open",
+            "resolved"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "choices": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Choices",
+          "type": "array"
+        },
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "choice": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Choice"
+        },
+        "comment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Comment"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "resolved_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Resolved At"
+        },
+        "blocking": {
+          "default": true,
+          "title": "Blocking",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "run_id",
+        "task_id",
+        "attempt_id",
+        "kind",
+        "status",
+        "version",
+        "title",
+        "summary",
+        "choices",
+        "artifact_ids",
+        "choice",
+        "comment",
+        "created_at",
+        "resolved_at"
+      ],
+      "title": "DecisionView",
+      "type": "object"
+    },
+    "EventsPage": {
+      "additionalProperties": false,
+      "properties": {
+        "events": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "run.cancelled": "#/$defs/RunCancelledEvent",
+                "run.created": "#/$defs/RunCreatedEvent",
+                "run.paused": "#/$defs/RunPausedEvent",
+                "run.pausing": "#/$defs/RunPausingEvent",
+                "run.resumed": "#/$defs/RunResumedEvent",
+                "task.queued": "#/$defs/TaskQueuedEvent",
+                "workflow.updated": "#/$defs/WorkflowUpdatedEvent"
+              },
+              "propertyName": "event_type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/RunCreatedEvent"
+              },
+              {
+                "$ref": "#/$defs/TaskQueuedEvent"
+              },
+              {
+                "$ref": "#/$defs/RunPausedEvent"
+              },
+              {
+                "$ref": "#/$defs/RunPausingEvent"
+              },
+              {
+                "$ref": "#/$defs/RunResumedEvent"
+              },
+              {
+                "$ref": "#/$defs/RunCancelledEvent"
+              },
+              {
+                "$ref": "#/$defs/WorkflowUpdatedEvent"
+              }
+            ]
+          },
+          "title": "Events",
+          "type": "array"
+        },
+        "next_after_seq": {
+          "title": "Next After Seq",
+          "type": "integer"
+        },
+        "has_more": {
+          "title": "Has More",
+          "type": "boolean"
+        },
+        "last_event_seq": {
+          "title": "Last Event Seq",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "events",
+        "next_after_seq",
+        "has_more",
+        "last_event_seq"
+      ],
+      "title": "EventsPage",
+      "type": "object"
+    },
+    "FileProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "relative_path": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Relative Path",
+          "type": "string"
+        },
+        "base_hash": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Base Hash"
+        },
+        "media_type": {
+          "default": "text/plain",
+          "title": "Media Type",
+          "type": "string"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "relative_path",
+        "content"
+      ],
+      "title": "FileProposal",
+      "type": "object"
+    },
+    "Location": {
+      "enum": [
+        "product",
+        "architecture",
+        "development",
+        "qa",
+        "security",
+        "devops",
+        "production",
+        "research",
+        "meeting",
+        "core"
+      ],
+      "title": "Location",
+      "type": "string"
+    },
+    "ProjectView": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "^[^\\x00]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 8000,
+          "minLength": 10,
+          "pattern": "^[^\\x00]*$",
+          "title": "Description",
+          "type": "string"
+        },
+        "profile": {
+          "const": "clinic_demo",
+          "default": "clinic_demo",
+          "title": "Profile",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "requirements_version": {
+          "minimum": 1,
+          "title": "Requirements Version",
+          "type": "integer"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "id",
+        "requirements_version",
+        "created_at"
+      ],
+      "title": "ProjectView",
+      "type": "object"
+    },
+    "Role": {
+      "enum": [
+        "product_manager",
+        "architect",
+        "cto",
+        "backend",
+        "frontend",
+        "qa",
+        "devops"
+      ],
+      "title": "Role",
+      "type": "string"
+    },
+    "RoleDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "$ref": "#/$defs/Role"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/Location"
+        },
+        "appearance_id": {
+          "title": "Appearance Id",
+          "type": "string"
+        },
+        "instructions_version": {
+          "title": "Instructions Version",
+          "type": "string"
+        },
+        "allowed_operations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Operations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "role",
+        "name",
+        "location",
+        "appearance_id",
+        "instructions_version"
+      ],
+      "title": "RoleDefinition",
+      "type": "object"
+    },
+    "RunCancelledEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "actor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Actor Id"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Task Id"
+        },
+        "correlation_id": {
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "causation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Causation Id"
+        },
+        "event_type": {
+          "const": "run.cancelled",
+          "default": "run.cancelled",
+          "title": "Event Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/RunStatePayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "project_id",
+        "run_id",
+        "seq",
+        "occurred_at",
+        "actor_id",
+        "task_id",
+        "correlation_id",
+        "causation_id",
+        "payload"
+      ],
+      "title": "RunCancelledEvent",
+      "type": "object"
+    },
+    "RunCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "enum": [
+            "pause",
+            "resume",
+            "cancel",
+            "retry_failed"
+          ],
+          "title": "Command",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "title": "RunCommand",
+      "type": "object"
+    },
+    "RunCreatedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "actor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Actor Id"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Task Id"
+        },
+        "correlation_id": {
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "causation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Causation Id"
+        },
+        "event_type": {
+          "const": "run.created",
+          "default": "run.created",
+          "title": "Event Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/RunCreatedPayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "project_id",
+        "run_id",
+        "seq",
+        "occurred_at",
+        "actor_id",
+        "task_id",
+        "correlation_id",
+        "causation_id",
+        "payload"
+      ],
+      "title": "RunCreatedEvent",
+      "type": "object"
+    },
+    "RunCreatedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "project": {
+          "$ref": "#/$defs/ProjectView"
+        },
+        "run": {
+          "$ref": "#/$defs/RunView"
+        },
+        "agents": {
+          "items": {
+            "$ref": "#/$defs/AgentView"
+          },
+          "title": "Agents",
+          "type": "array"
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UsageSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "project",
+        "run",
+        "agents"
+      ],
+      "title": "RunCreatedPayload",
+      "type": "object"
+    },
+    "RunLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "max_parallel_tasks": {
+          "default": 2,
+          "maximum": 2,
+          "minimum": 1,
+          "title": "Max Parallel Tasks",
+          "type": "integer"
+        },
+        "max_repair_iterations": {
+          "default": 2,
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Max Repair Iterations",
+          "type": "integer"
+        },
+        "max_llm_calls": {
+          "default": 64,
+          "maximum": 128,
+          "minimum": 1,
+          "title": "Max Llm Calls",
+          "type": "integer"
+        },
+        "max_tokens": {
+          "anyOf": [
+            {
+              "maximum": 1000000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Tokens"
+        },
+        "max_cost_usd": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Cost Usd"
+        },
+        "max_duration_seconds": {
+          "default": 1800,
+          "maximum": 14400,
+          "minimum": 60,
+          "title": "Max Duration Seconds",
+          "type": "integer"
+        },
+        "max_file_bytes": {
+          "default": 65536,
+          "maximum": 65536,
+          "minimum": 1024,
+          "title": "Max File Bytes",
+          "type": "integer"
+        },
+        "max_files_per_proposal": {
+          "default": 4,
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Max Files Per Proposal",
+          "type": "integer"
+        },
+        "max_proposal_bytes": {
+          "default": 262144,
+          "maximum": 262144,
+          "minimum": 1024,
+          "title": "Max Proposal Bytes",
+          "type": "integer"
+        }
+      },
+      "title": "RunLimits",
+      "type": "object"
+    },
+    "RunPausedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "actor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Actor Id"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Task Id"
+        },
+        "correlation_id": {
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "causation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Causation Id"
+        },
+        "event_type": {
+          "const": "run.paused",
+          "default": "run.paused",
+          "title": "Event Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/RunStatePayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "project_id",
+        "run_id",
+        "seq",
+        "occurred_at",
+        "actor_id",
+        "task_id",
+        "correlation_id",
+        "causation_id",
+        "payload"
+      ],
+      "title": "RunPausedEvent",
+      "type": "object"
+    },
+    "RunPausingEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "actor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Actor Id"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Task Id"
+        },
+        "correlation_id": {
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "causation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Causation Id"
+        },
+        "event_type": {
+          "const": "run.pausing",
+          "default": "run.pausing",
+          "title": "Event Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/RunStatePayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "project_id",
+        "run_id",
+        "seq",
+        "occurred_at",
+        "actor_id",
+        "task_id",
+        "correlation_id",
+        "causation_id",
+        "payload"
+      ],
+      "title": "RunPausingEvent",
+      "type": "object"
+    },
+    "RunResumedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "actor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Actor Id"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Task Id"
+        },
+        "correlation_id": {
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "causation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Causation Id"
+        },
+        "event_type": {
+          "const": "run.resumed",
+          "default": "run.resumed",
+          "title": "Event Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/RunStatePayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "project_id",
+        "run_id",
+        "seq",
+        "occurred_at",
+        "actor_id",
+        "task_id",
+        "correlation_id",
+        "causation_id",
+        "payload"
+      ],
+      "title": "RunResumedEvent",
+      "type": "object"
+    },
+    "RunStatePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "run": {
+          "$ref": "#/$defs/RunView"
+        },
+        "tasks": {
+          "items": {
+            "$ref": "#/$defs/TaskView"
+          },
+          "title": "Tasks",
+          "type": "array"
+        },
+        "agents": {
+          "items": {
+            "$ref": "#/$defs/AgentView"
+          },
+          "title": "Agents",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run",
+        "tasks",
+        "agents"
+      ],
+      "title": "RunStatePayload",
+      "type": "object"
+    },
+    "RunStatus": {
+      "enum": [
+        "created",
+        "running",
+        "pausing",
+        "paused",
+        "blocked",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "title": "RunStatus",
+      "type": "string"
+    },
+    "RunView": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "live",
+            "test"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "workflow_version": {
+          "title": "Workflow Version",
+          "type": "string"
+        },
+        "requirements_version": {
+          "title": "Requirements Version",
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/RunStatus"
+        },
+        "limits": {
+          "$ref": "#/$defs/RunLimits"
+        },
+        "last_event_seq": {
+          "minimum": 0,
+          "title": "Last Event Seq",
+          "type": "integer"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Started At"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Finished At"
+        },
+        "blocked_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Blocked Reason"
+        },
+        "cancel_requested": {
+          "default": false,
+          "title": "Cancel Requested",
+          "type": "boolean"
+        },
+        "pause_requested": {
+          "default": false,
+          "title": "Pause Requested",
+          "type": "boolean"
+        },
+        "profile_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile Version"
+        },
+        "profile_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile Hash"
+        },
+        "acceptance_suite_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Acceptance Suite Hash"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "mode",
+        "workflow_version",
+        "requirements_version",
+        "status",
+        "limits",
+        "last_event_seq",
+        "created_at",
+        "started_at",
+        "finished_at",
+        "blocked_reason"
+      ],
+      "title": "RunView",
+      "type": "object"
+    },
+    "SessionInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "command_token": {
+          "title": "Command Token",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_token"
+      ],
+      "title": "SessionInfo",
+      "type": "object"
+    },
+    "Snapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "project": {
+          "$ref": "#/$defs/ProjectView"
+        },
+        "run": {
+          "$ref": "#/$defs/RunView"
+        },
+        "tasks": {
+          "items": {
+            "$ref": "#/$defs/TaskView"
+          },
+          "title": "Tasks",
+          "type": "array"
+        },
+        "agents": {
+          "items": {
+            "$ref": "#/$defs/AgentView"
+          },
+          "title": "Agents",
+          "type": "array"
+        },
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/ArtifactView"
+          },
+          "title": "Artifacts",
+          "type": "array"
+        },
+        "last_event_seq": {
+          "minimum": 0,
+          "title": "Last Event Seq",
+          "type": "integer"
+        },
+        "agent_runs": {
+          "items": {
+            "$ref": "#/$defs/AgentRunView"
+          },
+          "title": "Agent Runs",
+          "type": "array"
+        },
+        "decisions": {
+          "items": {
+            "$ref": "#/$defs/DecisionView"
+          },
+          "title": "Decisions",
+          "type": "array"
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UsageSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CandidateView"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "project",
+        "run",
+        "tasks",
+        "agents",
+        "artifacts",
+        "last_event_seq"
+      ],
+      "title": "Snapshot",
+      "type": "object"
+    },
+    "StartRun": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "default": "live",
+          "enum": [
+            "live",
+            "test"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "limits": {
+          "$ref": "#/$defs/RunLimits"
+        }
+      },
+      "title": "StartRun",
+      "type": "object"
+    },
+    "TaskQueuedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "actor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Actor Id"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Task Id"
+        },
+        "correlation_id": {
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "causation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Causation Id"
+        },
+        "event_type": {
+          "const": "task.queued",
+          "default": "task.queued",
+          "title": "Event Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/TaskQueuedPayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "project_id",
+        "run_id",
+        "seq",
+        "occurred_at",
+        "actor_id",
+        "task_id",
+        "correlation_id",
+        "causation_id",
+        "payload"
+      ],
+      "title": "TaskQueuedEvent",
+      "type": "object"
+    },
+    "TaskQueuedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "task": {
+          "$ref": "#/$defs/TaskView"
+        }
+      },
+      "required": [
+        "task"
+      ],
+      "title": "TaskQueuedPayload",
+      "type": "object"
+    },
+    "TaskStatus": {
+      "enum": [
+        "queued",
+        "running",
+        "waiting_for_decision",
+        "blocked",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "title": "TaskStatus",
+      "type": "string"
+    },
+    "TaskView": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/Role"
+        },
+        "task_type": {
+          "title": "Task Type",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/TaskStatus"
+        },
+        "dependencies": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "input_versions": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Input Versions",
+          "type": "object"
+        },
+        "iteration": {
+          "minimum": 0,
+          "title": "Iteration",
+          "type": "integer"
+        },
+        "attempt": {
+          "minimum": 0,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "record_version": {
+          "minimum": 1,
+          "title": "Record Version",
+          "type": "integer"
+        },
+        "lease_owner": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lease Owner"
+        },
+        "lease_expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lease Expires At"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "fencing_token": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Fencing Token",
+          "type": "integer"
+        },
+        "active_attempt_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Active Attempt Id"
+        },
+        "blocked_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Blocked Reason"
+        }
+      },
+      "required": [
+        "id",
+        "run_id",
+        "role",
+        "task_type",
+        "status",
+        "dependencies",
+        "input_versions",
+        "iteration",
+        "attempt",
+        "record_version",
+        "lease_owner",
+        "lease_expires_at",
+        "created_at"
+      ],
+      "title": "TaskView",
+      "type": "object"
+    },
+    "UsageSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "request_count": {
+          "title": "Request Count",
+          "type": "integer"
+        },
+        "input_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Input Tokens"
+        },
+        "output_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Output Tokens"
+        },
+        "cost_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cost Usd"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Provider"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model"
+        },
+        "cached_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cached Tokens"
+        },
+        "latency_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latency Ms"
+        },
+        "source": {
+          "default": "unconfigured",
+          "enum": [
+            "test",
+            "live",
+            "unconfigured"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_count",
+        "input_tokens",
+        "output_tokens",
+        "cost_usd",
+        "provider",
+        "model"
+      ],
+      "title": "UsageSummary",
+      "type": "object"
+    },
+    "WorkflowUpdatedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "title": "Occurred At",
+          "type": "string"
+        },
+        "actor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Actor Id"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Task Id"
+        },
+        "correlation_id": {
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "causation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Causation Id"
+        },
+        "event_type": {
+          "const": "workflow.updated",
+          "default": "workflow.updated",
+          "title": "Event Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/WorkflowUpdatedPayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "project_id",
+        "run_id",
+        "seq",
+        "occurred_at",
+        "actor_id",
+        "task_id",
+        "correlation_id",
+        "causation_id",
+        "payload"
+      ],
+      "title": "WorkflowUpdatedEvent",
+      "type": "object"
+    },
+    "WorkflowUpdatedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "run": {
+          "$ref": "#/$defs/RunView"
+        },
+        "tasks": {
+          "items": {
+            "$ref": "#/$defs/TaskView"
+          },
+          "title": "Tasks",
+          "type": "array"
+        },
+        "agents": {
+          "items": {
+            "$ref": "#/$defs/AgentView"
+          },
+          "title": "Agents",
+          "type": "array"
+        },
+        "action": {
+          "title": "Action",
+          "type": "string"
+        },
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/ArtifactView"
+          },
+          "title": "Artifacts",
+          "type": "array"
+        },
+        "agent_runs": {
+          "items": {
+            "$ref": "#/$defs/AgentRunView"
+          },
+          "title": "Agent Runs",
+          "type": "array"
+        },
+        "decisions": {
+          "items": {
+            "$ref": "#/$defs/DecisionView"
+          },
+          "title": "Decisions",
+          "type": "array"
+        },
+        "usage": {
+          "$ref": "#/$defs/UsageSummary"
+        },
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CandidateView"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "run",
+        "tasks",
+        "agents",
+        "action",
+        "artifacts",
+        "agent_runs",
+        "decisions",
+        "usage"
+      ],
+      "title": "WorkflowUpdatedPayload",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "create_project": {
+      "$ref": "#/$defs/CreateProject"
+    },
+    "start_run": {
+      "$ref": "#/$defs/StartRun"
+    },
+    "run_command": {
+      "$ref": "#/$defs/RunCommand"
+    },
+    "snapshot": {
+      "$ref": "#/$defs/Snapshot"
+    },
+    "events_page": {
+      "$ref": "#/$defs/EventsPage"
+    },
+    "capabilities": {
+      "$ref": "#/$defs/CapabilitiesResponse"
+    },
+    "problem": {
+      "$ref": "#/$defs/ApiProblem"
+    },
+    "usage": {
+      "$ref": "#/$defs/UsageSummary"
+    },
+    "session": {
+      "$ref": "#/$defs/SessionInfo"
+    },
+    "command_receipt": {
+      "$ref": "#/$defs/CommandReceiptView"
+    },
+    "decision_resolution": {
+      "$ref": "#/$defs/DecisionResolution"
+    },
+    "artifact_content": {
+      "$ref": "#/$defs/ArtifactContent"
+    },
+    "attempt_trace": {
+      "$ref": "#/$defs/AttemptTrace"
+    },
+    "file_proposal": {
+      "$ref": "#/$defs/FileProposal"
+    }
+  },
+  "required": [
+    "create_project",
+    "start_run",
+    "run_command",
+    "snapshot",
+    "events_page",
+    "capabilities",
+    "problem",
+    "usage",
+    "session",
+    "command_receipt",
+    "decision_resolution",
+    "artifact_content",
+    "attempt_trace",
+    "file_proposal"
+  ],
+  "title": "ContractBundle",
+  "type": "object"
+}

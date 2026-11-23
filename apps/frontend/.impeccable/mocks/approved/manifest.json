@@ -1,0 +1,14 @@
+[
+  {
+    "file": "codehead_night_atelier_20261122_concepts_v2.jpg",
+    "role": "architecture_and_ui",
+    "sha256": "551d755d795ab2e35039ecd54cc1836018649b4191d548a72e436b668a2e1d18",
+    "source_sha256": "d1c86d9933079b3f1805bdf0ae7c37fe457ac306dd2e2d3d5fb522c0aac1d737"
+  },
+  {
+    "file": "codehead_luminous_campus_20261122_concepts_v2.jpg",
+    "role": "room_colors",
+    "sha256": "c4861d4643ae589bb660928bd2b4d57616823cf00214726478fd2e8820ea08aa",
+    "source_sha256": "f79b3c7dc2cc9f6886d92b039a1540f8aca0b00b1a4d606a1e46f3e2c98d205b"
+  }
+]

@@ -1,0 +1,104 @@
+{
+  "id": "clinic_demo/v1",
+  "title": "Clinic Demo",
+  "synthetic_data_only": true,
+  "timezone": "Asia/Yekaterinburg",
+  "slot_minutes": 30,
+  "stack": {
+    "backend": "FastAPI/Python 3.11",
+    "storage": "candidate-local SQLite",
+    "frontend": "React/TypeScript/Vite",
+    "platform_database": "PostgreSQL is outside the candidate"
+  },
+  "endpoints": {
+    "/health": {
+      "GET": {"status": 200, "response": "health"}
+    },
+    "/api/doctors": {
+      "GET": {"status": 200, "response": "doctor_list"},
+      "POST": {"status": 201, "request": "doctor_create", "response": "doctor"}
+    },
+    "/api/doctors/{id}": {
+      "GET": {"status": 200, "response": "doctor"},
+      "PATCH": {"status": 200, "request": "doctor_patch", "response": "doctor"}
+    },
+    "/api/patients": {
+      "GET": {"status": 200, "response": "patient_list"},
+      "POST": {"status": 201, "request": "patient_create", "response": "patient"}
+    },
+    "/api/patients/{id}": {
+      "GET": {"status": 200, "response": "patient"},
+      "PATCH": {"status": 200, "request": "patient_patch", "response": "patient"}
+    },
+    "/api/appointments": {
+      "GET": {"status": 200, "response": "appointment_list"},
+      "POST": {"status": 201, "request": "appointment_create", "response": "appointment"}
+    },
+    "/api/appointments/{id}": {
+      "GET": {"status": 200, "response": "appointment"},
+      "PATCH": {"status": 200, "request": "appointment_patch", "response": "appointment"}
+    },
+    "/api/appointments/{id}/cancel": {
+      "POST": {"status": 200, "request": "cancel", "response": "appointment"}
+    }
+  },
+  "errors": [404, 409, 422],
+  "error_response": {
+    "schema": "error",
+    "required_fields": ["code", "message"],
+    "raw_input_echo": false,
+    "traceback": false
+  },
+  "identifiers": "UUID",
+  "text_fields": {"max_length": 120, "non_blank": true},
+  "patch": {"partial": true, "min_properties": 1, "additional_properties": false},
+  "appointments": {
+    "statuses": ["scheduled", "cancelled"],
+    "starts_at_input": "RFC3339 with an explicit UTC offset",
+    "starts_at_storage": "UTC",
+    "starts_at_response": "UTC (Z or +00:00)",
+    "local_start_minutes": [0, 30],
+    "seconds": 0,
+    "microseconds": 0,
+    "create_and_reschedule_start": "strictly after the trusted server clock",
+    "active_unique_slots": [["doctor_id", "starts_at_utc"], ["patient_id", "starts_at_utc"]],
+    "database_constraint": "two partial UNIQUE indexes WHERE status = scheduled",
+    "reschedule": "only a scheduled appointment whose existing start is future",
+    "references": "doctor_id and patient_id exist; checks and mutation share one transaction",
+    "cancel": "atomic; keep history; repeated cancellation returns the same cancelled state",
+    "cancel_past_scheduled": "409",
+    "reschedule_cancelled_or_past": "409",
+    "slot_conflict": "409",
+    "invalid_time_or_format": "422",
+    "missing_reference_or_resource": "404"
+  },
+  "writable_files": {
+    "backend": ["backend/clinic_api.py", "backend/clinic_models.py", "backend/clinic_storage.py"],
+    "frontend": ["frontend/src/App.tsx", "frontend/src/api.ts", "frontend/src/styles.css"]
+  },
+  "file_normalization": "utf8-bom-lf/v1",
+  "acceptance": {
+    "entrypoint": "acceptance/run_suite.py",
+    "test_file": "acceptance/test_http.py",
+    "transport": "real loopback HTTP",
+    "test_now": "2030-01-01T00:00:00Z",
+    "fresh_candidate_database_per_test": true,
+    "candidate_imports_in_harness": false,
+    "candidate_pytest_configuration": false,
+    "hash_check": "normalized suite sources before and after; a change invalidates the report"
+  },
+  "trusted_commands": {
+    "backend": ["<verified-python>", "backend/main.py"],
+    "frontend_check": ["<verified-node>", "<verified-node-modules>/typescript/bin/tsc", "--noEmit"],
+    "frontend_build": ["<verified-node>", "<verified-node-modules>/vite/bin/vite.js", "build"],
+    "acceptance": ["<verified-python>", "acceptance/run_suite.py", "--candidate-root", "<workspace>"]
+  },
+  "dependencies": {
+    "python_lock": "requirements.lock",
+    "frontend_lock": "frontend/package-lock.json",
+    "cache_inputs": ["profile", "lockfiles", "operating_system", "architecture", "Node", "Python"],
+    "dev_install": false,
+    "unavailable_status": "dependency_unavailable"
+  },
+  "isolation_level": "process_only"
+}
