@@ -1,6 +1,6 @@
 # CodeHead
 
-Git ведётся в аккаунте [alexsashka1771](https://github.com/alexsashka1771). Правила веток, коммитов, проверок и авторства — [GIT_WORKFLOW](docs/GIT_WORKFLOW.md).
+Приватный репозиторий — [alexsashka1771/codehead](https://github.com/alexsashka1771/codehead). Правила веток, коммитов, проверок и авторства — [GIT_WORKFLOW](docs/GIT_WORKFLOW.md).
 
 Локальная фабрика разработки: Python/FastAPI, PostgreSQL, React/TypeScript и изометрическая 3D-сцена. Реализован первый рабочий этап: проекты, сохранённая очередь семи ролей, команды запуска, история событий и интерфейс.
 

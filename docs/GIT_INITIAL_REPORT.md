@@ -20,3 +20,7 @@
 В Git входят код, locks, нормативные документы, профили, тесты и утверждённые художественные референсы. .data, базы, окружения, node_modules, build outputs, приватные ключи и снимки промежуточных ревью исключены; локальные файлы не удалялись. Оригинальный OFL шрифта сохранён. Pre-commit hook проверяет staged credentials и diff whitespace; глобальный git config не менялся.
 
 Последующие логические шаги и push регулирует [GIT_WORKFLOW](GIT_WORKFLOW.md). Initial import не означает готовность Clinic Demo, live-провайдера, всей курсовой или диплома.
+
+## Подтверждение заливки
+
+Создан [alexsashka1771/codehead](https://github.com/alexsashka1771/codehead). GitHub API подтвердил owner=alexsashka1771, private=true, default_branch=main. Initial source commit — `80b06fa849a5b87ec748e733e6baddf99a33ec56`; `git ls-remote` подтвердил этот SHA для main и созданной feat/clinic-candidate. Hook фактически проверил 225 staged files перед коммитом, ключей и приватных данных не нашёл. Незавершённые шесть fixture-файлов сохранены локально для продолжения разработки и не потеряны при переключении веток.
