@@ -140,6 +140,44 @@ def test_changed_serialization_of_committed_manifest_is_refused(tmp_path):
     assert not (tmp_path / candidate.id).exists()
 
 
+def test_changed_workspace_reads_are_bounded_by_the_committed_size(tmp_path, monkeypatch):
+    candidate, contents, manifest = descriptor()
+    module = workspace_module()
+    path = module.materialize(tmp_path, candidate, contents, manifest)
+    target = path / "backend/clinic_api.py"
+    target.write_bytes(b"x" * (8 * 1024 * 1024))
+    original_open = Path.open
+    received = []
+
+    class Reader:
+        def __init__(self, stream):
+            self.stream = stream
+
+        def __enter__(self):
+            self.stream.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.stream.__exit__(*args)
+
+        def __getattr__(self, name):
+            return getattr(self.stream, name)
+
+        def read(self, size=-1):
+            value = self.stream.read(size)
+            received.append(len(value))
+            return value
+
+    def watched_open(file, *args, **kwargs):
+        stream = original_open(file, *args, **kwargs)
+        return Reader(stream) if file == target else stream
+
+    monkeypatch.setattr(Path, "open", watched_open)
+    with pytest.raises(InvalidFile):
+        module.materialize(tmp_path, candidate, contents, manifest)
+    assert sum(received) <= candidate.files[0].byte_size * 2 + 4
+
+
 def test_missing_content_refuses_a_partial_workspace(tmp_path):
     candidate, _, manifest = descriptor()
     with pytest.raises(InvalidFile):

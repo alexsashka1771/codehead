@@ -1,12 +1,11 @@
 """Load trusted Clinic inputs without importing candidate implementations."""
 
 import json
-import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from codehead.clinic.files import normalize_text as _normalize_text
-from codehead.clinic.files import text_hash, tree_hash
+from codehead.clinic.files import text_hash, tree_hash, workspace_path
 
 PROFILE_ID = "clinic_demo/v1"
 REPOSITORY_ROOT = Path(__file__).resolve().parents[5]
@@ -51,12 +50,8 @@ def normalize_text(content: str | bytes) -> str:
 
 
 def _read_text(path: Path) -> str:
-    attributes = path.lstat()
-    if path.is_symlink() or getattr(attributes, "st_file_attributes", 0) & getattr(
-        stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0
-    ):
-        raise ValueError("Trusted profile files must not be reparse points.")
-    return normalize_text(path.read_bytes())
+    checked = workspace_path(path.parent, path.name)
+    return normalize_text(checked.read_bytes())
 
 
 def _media_type(path: Path) -> str:
@@ -72,28 +67,37 @@ def _media_type(path: Path) -> str:
 
 def _files(root: Path, *, python_only: bool = False) -> tuple[TemplateFile, ...]:
     files = []
-    for path in sorted(root.rglob("*")):
-        if not path.is_file() or "__pycache__" in path.parts:
-            continue
-        if python_only and path.suffix != ".py":
-            continue
-        content = _read_text(path)
-        files.append(
-            TemplateFile(
-                relative_path=path.relative_to(root).as_posix(),
-                content=content,
-                content_hash=text_hash(content),
-                media_type=_media_type(path),
+    workspace_path(root, ".source-boundary")
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        for path in directory.iterdir():
+            if path.name.casefold() == "__pycache__":
+                continue
+            checked = workspace_path(root, path.relative_to(root).as_posix())
+            if checked.is_dir():
+                pending.append(checked)
+                continue
+            if not checked.is_file() or (python_only and checked.suffix != ".py"):
+                continue
+            content = _read_text(checked)
+            files.append(
+                TemplateFile(
+                    relative_path=checked.relative_to(root).as_posix(),
+                    content=content,
+                    content_hash=text_hash(content),
+                    media_type=_media_type(checked),
+                )
             )
-        )
     if not files:
         raise ValueError("A trusted profile source boundary is empty.")
-    return tuple(files)
+    return tuple(sorted(files, key=lambda file: file.relative_path))
 
 
 def load_profile(root: Path | None = None) -> ClinicProfile:
     """Read and hash only profile, schemas, acceptance Python and template files."""
-    root = (root or PROFILE_ROOT).resolve()
+    root = Path(root or PROFILE_ROOT).absolute()
+    workspace_path(root, "profile.json")
     definition_json = _read_text(root / "profile.json")
     schemas_json = _read_text(root / "schemas.json")
     definition = json.loads(definition_json)

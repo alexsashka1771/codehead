@@ -1,12 +1,68 @@
 import hashlib
 import json
+import os
 import shutil
+import subprocess
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
 
 PROFILE_ROOT = Path(__file__).resolve().parents[3] / "profiles" / "clinic_demo" / "v1"
+
+
+def junction(path, target):
+    def quote(value):
+        return "'" + str(value).replace("'", "''") + "'"
+
+    subprocess.run(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            f"New-Item -ItemType Junction -Path {quote(path)} -Target {quote(target)} | Out-Null",
+        ],
+        check=True,
+        capture_output=True,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Requires a real Windows junction")
+@pytest.mark.parametrize("linked", ["template/backend", "acceptance", "root"])
+def test_profile_rejects_parent_and_root_junctions_before_loading_sources(tmp_path, linked):
+    from codehead.clinic.profile import load_profile
+
+    actual = tmp_path / "actual"
+    if linked == "root":
+        shutil.copytree(
+            PROFILE_ROOT, actual, ignore=shutil.ignore_patterns("__pycache__", "fixtures")
+        )
+        root = tmp_path / "profile"
+        junction(root, actual)
+    else:
+        root = tmp_path / "profile"
+        root.mkdir()
+        for name in ("profile.json", "schemas.json"):
+            shutil.copyfile(PROFILE_ROOT / name, root / name)
+        if linked == "template/backend":
+            shutil.copytree(
+                PROFILE_ROOT / "acceptance",
+                root / "acceptance",
+                ignore=shutil.ignore_patterns("__pycache__"),
+            )
+            shutil.copytree(
+                PROFILE_ROOT / "template",
+                root / "template",
+                ignore=shutil.ignore_patterns("backend"),
+            )
+        else:
+            shutil.copytree(PROFILE_ROOT / "template", root / "template")
+        shutil.copytree(PROFILE_ROOT / linked, actual, ignore=shutil.ignore_patterns("__pycache__"))
+        junction(root / linked, actual)
+    with pytest.raises(ValueError):
+        load_profile(root)
 
 
 def test_profile_has_a_fixed_http_boundary():

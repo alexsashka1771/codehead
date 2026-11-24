@@ -41,9 +41,19 @@ def _unique_json(pairs):
     return value
 
 
-def _read(path):
+def _read(path, normalized_size):
     try:
-        return normalize_text(path.read_bytes().decode("utf-8", errors="strict"))
+        maximum = normalized_size * 2 + 3
+        with path.open("rb") as stream:
+            if os.fstat(stream.fileno()).st_size > maximum:
+                raise InvalidFile("Файл workspace превышает размер committed версии.")
+            raw = stream.read(maximum + 1)
+        if len(raw) > maximum:
+            raise InvalidFile("Файл workspace вырос сверх размера committed версии.")
+        content = normalize_text(raw.decode("utf-8", errors="strict"))
+        if len(content.encode("utf-8")) != normalized_size:
+            raise InvalidFile("Размер файла workspace не соответствует committed версии.")
+        return content
     except UnicodeDecodeError as error:
         raise InvalidFile("Файл workspace не является корректным UTF-8.") from error
 
@@ -106,7 +116,8 @@ def materialize(
     _scan_existing(destination, {path.casefold() for path in expected})
     targets = {path: workspace_path(destination, path) for path in expected}
     for path, target in targets.items():
-        if target.exists() and text_hash(_read(target)) != text_hash(expected[path]):
+        size = len(expected[path].encode("utf-8"))
+        if target.exists() and text_hash(_read(target, size)) != text_hash(expected[path]):
             raise InvalidFile("Файл версии изменён; существующее содержимое сохранено.")
     for path, target in targets.items():
         if not target.exists():
@@ -119,7 +130,9 @@ def materialize(
                 stream.flush()
                 os.fsync(stream.fileno())
         workspace_path(destination, path)
-        if text_hash(_read(target)) != text_hash(expected[path]):
+        if text_hash(_read(target, len(expected[path].encode("utf-8")))) != text_hash(
+            expected[path]
+        ):
             raise InvalidFile("Записанный файл не прошёл проверку хэша.")
     _scan_existing(destination, {path.casefold() for path in expected})
     return destination
