@@ -1,4 +1,10 @@
-# План реализации: кандидат Clinic Demo
+# План реализации: Runner проверок, подэтап 4.1
+
+24 ноября 2026 автор попросил двигаться дальше. Подэтап 4.1 — [RUNNER_DESIGN](RUNNER_DESIGN.md), [RUNNER_PLAN](RUNNER_PLAN.md): три ручные доверенные проверки ready test-кандидата, сохраняемые ToolRun, короткая API-очередь и отдельный worker. Результаты и ограничения — [RUNNER_REPORT](RUNNER_REPORT.md). Рабочая ветка — codex/runner-checks; порядок Git прежний.
+
+Следующий подэтап 4.2 — QA, независимый red/green и две неудачные repair-попытки; 4.3 — DevOps и preview отдельного origin. Публичный Runner уже выполняет validate_backend/test_backend/build_frontend; остальные операции, автоматические роли и Live не объявляются доступными. Старые clinic-v1/v2 и их история сохраняются, пользовательская БД не очищается.
+
+## История: кандидат Clinic Demo
 
 24 ноября 2026 продолжена сессия 3: [CLINIC_DESIGN](CLINIC_DESIGN.md), [CLINIC_PLAN](CLINIC_PLAN.md). Новый clinic-v2 проходит PM → Architect → CTO, решение автора и независимые Backend/Frontend; immutable manifest материализуется вне HTTP/транзакции. В интерфейсе доступны версия, исходники, хэши и происхождение. Старый clinic-v1 сохраняет границу трёх ролей. Фактические проверки и ограничения — [CLINIC_REPORT](CLINIC_REPORT.md).
 

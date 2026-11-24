@@ -33,6 +33,7 @@ from codehead.persistence.models import (
     WorkerHeartbeat,
 )
 from codehead.persistence.service import ProjectService, identifier, now
+from codehead.persistence.tools import SUPPORTED_TOOLS
 from codehead.workflow.publication import NEXT_STAGE_REASON, PublicationTransactions
 
 DOCUMENT_ROLES = ("product_manager", "architect", "cto")
@@ -68,6 +69,7 @@ class WorkerService(PublicationTransactions, ProjectService):
         step_delay=0,
         workspace_root=None,
         materializer=materialize,
+        tool_runner=None,
     ):
         super().__init__(database)
         if not 1 <= lease_seconds <= 300:
@@ -82,6 +84,8 @@ class WorkerService(PublicationTransactions, ProjectService):
             workspace_root or REPOSITORY_ROOT / ".data" / "candidates"
         ).absolute()
         self.materializer = materializer
+        self.tool_runner = tool_runner
+        self.supported_tools = SUPPORTED_TOOLS
 
     @staticmethod
     def _supported_roles(run):
@@ -94,6 +98,7 @@ class WorkerService(PublicationTransactions, ProjectService):
             heartbeat = WorkerHeartbeat(owner=owner, supported_roles=list(SUPPORTED_ROLES))
             session.add(heartbeat)
         heartbeat.supported_roles = list(SUPPORTED_ROLES)
+        heartbeat.supported_tools = list(self.supported_tools)
         heartbeat.updated_at = stamp
         heartbeat.expires_at = stamp + timedelta(seconds=self.lease_seconds)
 
@@ -349,6 +354,12 @@ class WorkerService(PublicationTransactions, ProjectService):
                 return None
             if (
                 sum(attempt.status in {"created", "running"} for attempt in attempts)
+                + sum(
+                    tool.status == "running"
+                    or tool.status == "created"
+                    and tool.lease_owner is not None
+                    for tool in self._tools(session, run.id)
+                )
                 >= limits["max_parallel_tasks"]
             ):
                 return None
@@ -853,6 +864,7 @@ class WorkerService(PublicationTransactions, ProjectService):
                 )
             )
             for run in runs:
+                recovered += self._recover_tools(session, run)
                 recovered += self._recover_publication(session, run)
                 connected = (
                     session.scalar(

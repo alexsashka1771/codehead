@@ -16,16 +16,34 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-async function flushPreparation() { await new Promise(resolve => setTimeout(resolve, 0)); }
+const preparationTasks = new Map<number, () => void>();
+let preparationTaskId = 0;
+async function flushPreparation() {
+  await Promise.resolve();
+  while (preparationTasks.size) {
+    const tasks = [...preparationTasks.values()];
+    preparationTasks.clear();
+    for (const task of tasks) task();
+    await Promise.resolve();
+  }
+}
 
 beforeEach(() => {
+  preparationTasks.clear();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     queueMicrotask(() => callback(0));
     return 1;
   });
   vi.stubGlobal('cancelAnimationFrame', () => {});
-  vi.stubGlobal('window', { setTimeout, clearTimeout });
+  vi.stubGlobal('window', {
+    setTimeout: (callback: () => void) => {
+      const id = ++preparationTaskId;
+      preparationTasks.set(id, callback);
+      return id;
+    },
+    clearTimeout: (id: number) => preparationTasks.delete(id),
+  });
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 

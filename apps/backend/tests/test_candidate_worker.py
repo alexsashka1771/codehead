@@ -518,9 +518,7 @@ def test_qa_waits_for_publication_and_materializer_runs_outside_transaction(data
     assert snapshot.candidate.revision == 3
     assert snapshot.candidate.workspace_path == str(tmp_path / committed.id / "v3")
     assert snapshot.run.status == "blocked"
-    assert all(
-        item in snapshot.run.blocked_reason for item in ("QA", "DevOps", "Runner", "preview")
-    )
+    assert all(item in snapshot.run.blocked_reason for item in ("QA", "DevOps", "preview"))
     assert len(snapshot.agent_runs) == 5
     assert snapshot.tasks[5].status == "blocked"
     assert service.events(run.id).events[-1].payload.candidate == snapshot.candidate

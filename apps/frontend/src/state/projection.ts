@@ -42,9 +42,9 @@ export function applyEvent(snapshot: Snapshot, event: DomainEvent): Snapshot {
       return hydrateSnapshot({ ...snapshot, ...event.payload, run: { ...event.payload.run, ...cursor }, ...cursor });
     case 'workflow.updated': {
       if (event.payload.run.id !== snapshot.run.id) throw new ProjectionError('foreign_run');
-      const { run, tasks, agents, artifacts, agent_runs, decisions, usage, candidate } = event.payload;
+      const { run, tasks, agents, artifacts, agent_runs, decisions, usage, candidate, tool_runs } = event.payload;
       return hydrateSnapshot({ ...snapshot, run: { ...run, ...cursor }, tasks, agents, artifacts,
-        agent_runs, decisions, usage, candidate: candidate ?? null, ...cursor });
+        agent_runs, decisions, usage, candidate: candidate ?? null, tool_runs: tool_runs ?? [], ...cursor });
     }
     default:
       throw new ProjectionError('unsupported_event');
@@ -66,6 +66,11 @@ function validatePayloadScope(snapshot: Snapshot, event: DomainEvent) {
   if ('artifacts' in payload) check(payload.artifacts);
   if ('agent_runs' in payload) check(payload.agent_runs);
   if ('decisions' in payload) check(payload.decisions);
+  if ('tool_runs' in payload && payload.tool_runs) check(payload.tool_runs);
+  if ('tool_runs' in payload || ('decisions' in payload && payload.decisions.some(decision => decision.tool_run_id != null || decision.kind === 'tool_uncertain_outcome'))) {
+    hydrateSnapshot({ ...snapshot, ...payload, tool_runs: 'tool_runs' in payload ? payload.tool_runs ?? snapshot.tool_runs : snapshot.tool_runs,
+      last_event_seq: 'run' in payload ? payload.run.last_event_seq : snapshot.last_event_seq });
+  }
   if ('candidate' in payload && payload.candidate) {
     check([payload.candidate]);
     validateCandidate({ ...snapshot, ...payload });
@@ -83,7 +88,7 @@ export function projectHistory(events: DomainEvent[], expectedLastSeq?: number):
     schema_version: 1, project: first.payload.project,
     run: { ...first.payload.run, last_event_seq: 0 },
     tasks: [], agents: [], artifacts: [], last_event_seq: 0,
-    agent_runs: [], decisions: [], usage: null, candidate: null,
+    agent_runs: [], decisions: [], usage: null, candidate: null, tool_runs: [],
   };
   for (const [index, event] of events.entries()) {
     if (index > 0 && event.event_type === 'run.created') throw new ProjectionError('invalid_history');
@@ -114,6 +119,12 @@ export function normalizeSnapshot(snapshot: Snapshot): Snapshot {
     decision.created_at = normalizeTimestamp(decision.created_at);
     if (decision.resolved_at !== null) decision.resolved_at = normalizeTimestamp(decision.resolved_at);
   }
+  for (const tool of normalized.tool_runs ?? []) {
+    tool.created_at = normalizeTimestamp(tool.created_at);
+    for (const field of ['started_at', 'finished_at', 'lease_expires_at'] as const) {
+      if (tool[field] != null) tool[field] = normalizeTimestamp(tool[field]);
+    }
+  }
   if (normalized.candidate) {
     normalized.candidate.created_at = normalizeTimestamp(normalized.candidate.created_at);
     normalized.candidate.updated_at = normalizeTimestamp(normalized.candidate.updated_at);
@@ -125,6 +136,7 @@ export function normalizeSnapshot(snapshot: Snapshot): Snapshot {
   normalized.artifacts.sort(byId);
   normalized.agent_runs?.sort(byId);
   normalized.decisions?.sort(byId);
+  normalized.tool_runs?.sort(byId);
   return normalized;
 }
 
@@ -146,7 +158,8 @@ function withCompatibilityDefaults(snapshot: Snapshot): Snapshot {
         max_proposal_bytes: snapshot.run.limits.max_proposal_bytes ?? 262144 } },
     candidate: snapshot.candidate ?? null,
     tasks: snapshot.tasks.map(taskDefaults), agent_runs: snapshot.agent_runs ?? [],
-    decisions: (snapshot.decisions ?? []).map(decision => ({ ...decision, blocking: decision.blocking ?? true })),
+    decisions: (snapshot.decisions ?? []).map(decision => ({ ...decision, blocking: decision.blocking ?? true, tool_run_id: decision.tool_run_id ?? null })),
+    tool_runs: snapshot.tool_runs ?? [],
     usage: snapshot.usage == null ? null : { ...snapshot.usage,
       source: snapshot.usage.source ?? 'unconfigured', cached_tokens: snapshot.usage.cached_tokens ?? null,
       latency_ms: snapshot.usage.latency_ms ?? null },
@@ -163,7 +176,7 @@ export function hydrateSnapshot(snapshot: Snapshot): Snapshot {
   const normalized = withCompatibilityDefaults(snapshot);
   if (normalized.candidate && normalized.candidate.run_id !== normalized.run.id) throw new ProjectionError('foreign_run');
   const collections = [normalized.tasks, normalized.agents, normalized.artifacts,
-    normalized.agent_runs ?? [], normalized.decisions ?? []];
+    normalized.agent_runs ?? [], normalized.decisions ?? [], normalized.tool_runs ?? []];
   for (const collection of collections) {
     const ids = new Set<string>();
     for (const entity of collection) {
@@ -177,6 +190,7 @@ export function hydrateSnapshot(snapshot: Snapshot): Snapshot {
   const artifactIds = new Set(normalized.artifacts.map(artifact => artifact.id));
   const attemptIds = new Set(normalized.agent_runs?.map(attempt => attempt.id));
   const decisionIds = new Set(normalized.decisions?.map(decision => decision.id));
+  const toolIds = new Set(normalized.tool_runs?.map(tool => tool.id));
   const requireId = (id: string | null | undefined, ids: Set<string>) => {
     if (id != null && !ids.has(id)) throw new ProjectionError('foreign_run');
   };
@@ -189,10 +203,29 @@ export function hydrateSnapshot(snapshot: Snapshot): Snapshot {
   }
   for (const decision of normalized.decisions ?? []) {
     requireId(decision.task_id, taskIds); requireId(decision.attempt_id, attemptIds);
+    requireId(decision.tool_run_id, toolIds);
+    if (decision.kind === 'tool_uncertain_outcome' && (decision.task_id !== null || decision.attempt_id !== null || decision.tool_run_id == null)) throw new ProjectionError('invalid_event');
+    if (decision.kind !== 'tool_uncertain_outcome' && decision.tool_run_id != null) throw new ProjectionError('invalid_event');
     for (const id of decision.artifact_ids) requireId(id, artifactIds);
   }
   validateCandidate(normalized);
+  validateTools(normalized);
   return normalized;
+}
+
+function validateTools(snapshot: Snapshot) {
+  for (const tool of snapshot.tool_runs ?? []) {
+    const candidate = snapshot.candidate;
+    const manifest = snapshot.artifacts.find(artifact => artifact.id === tool.manifest_artifact_id);
+    if (!candidate || tool.workspace_id !== candidate.id || !manifest || manifest.run_id !== snapshot.run.id) throw new ProjectionError('foreign_run');
+    if (!['created', 'running', 'succeeded', 'failed', 'cancelled', 'uncertain', 'timed_out'].includes(tool.status)
+      || !Number.isSafeInteger(tool.snapshot_version) || tool.snapshot_version < 1 || tool.snapshot_version > candidate.revision
+      || manifest.artifact_type !== 'candidate_manifest' || manifest.version !== tool.snapshot_version || manifest.content_hash !== tool.manifest_hash
+      || ![tool.tree_hash, tool.manifest_hash, tool.profile_hash, tool.acceptance_suite_hash, tool.template_hash].every(hash => /^[a-f0-9]{64}$/.test(hash))) throw new ProjectionError('invalid_event');
+    if (tool.snapshot_version === candidate.revision && (tool.tree_hash !== candidate.tree_hash || tool.manifest_artifact_id !== candidate.manifest_artifact_id
+      || tool.manifest_hash !== candidate.manifest_hash || tool.profile_version !== candidate.profile_version || tool.profile_hash !== candidate.profile_hash
+      || tool.acceptance_suite_hash !== candidate.acceptance_suite_hash || tool.template_hash !== candidate.template_hash)) throw new ProjectionError('invalid_event');
+  }
 }
 
 function validateCandidate(snapshot: Snapshot) {

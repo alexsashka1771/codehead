@@ -45,7 +45,7 @@ export function AgentPanel({ definition, snapshot, active, connected, pending, o
   const inputs = snapshot?.artifacts.filter(artifact => Object.entries(task?.input_versions ?? {}).some(([id, version]) =>
     (artifact.id === id || artifact.artifact_type === id) && artifact.version === version)) ?? [];
   const visibleArtifacts = [...new Map([...artifacts, ...inputs].map(artifact => [artifact.id, artifact])).values()];
-  const decisions = snapshot?.decisions?.filter(decision => taskIds.has(decision.task_id)) ?? [];
+  const decisions = snapshot?.decisions?.filter(decision => decision.task_id != null && taskIds.has(decision.task_id)) ?? [];
   const queued = snapshot?.tasks.filter(item => item.role === definition.role && item.status === 'queued').length ?? 0;
   const previewUrl = new URL(window.location.href);
   previewUrl.searchParams.set('view', 'animations');

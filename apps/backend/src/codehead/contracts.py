@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Contract(BaseModel):
@@ -247,12 +247,65 @@ class AgentRunView(Contract):
     trace_available: bool
 
 
+ToolOperation = Literal["validate_backend", "test_backend", "build_frontend"]
+
+
+class ToolCommand(Contract):
+    operation_id: ToolOperation
+    workspace_id: str = Field(
+        pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    )
+    snapshot_version: int = Field(ge=1)
+    required_isolation: Literal["process_only", "container", "remote"] = "process_only"
+    timeout_seconds: int = Field(default=180, ge=1, le=180)
+    output_limit_bytes: int = Field(default=262144, ge=1024, le=262144)
+
+
+class ToolRunView(ToolCommand):
+    model_config = ConfigDict(extra="forbid", from_attributes=True, str_strip_whitespace=False)
+    id: str
+    run_id: str
+    status: Literal[
+        "created", "running", "succeeded", "failed", "timed_out", "cancelled", "uncertain"
+    ]
+    isolation_level: Literal["process_only"] = "process_only"
+    tree_hash: str
+    manifest_artifact_id: str
+    manifest_hash: str
+    profile_version: str
+    profile_hash: str
+    acceptance_suite_hash: str
+    template_hash: str
+    commands: list[list[str]] = Field(default_factory=list)
+    stdout: str = ""
+    stderr: str = ""
+    report: dict | None = None
+    exit_code: int | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+    process_id: int | None = None
+    created_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    fencing_token: int = Field(default=0, ge=0)
+    lease_owner: str | None = None
+    lease_expires_at: datetime | None = None
+
+    @field_validator("created_at", "started_at", "finished_at", "lease_expires_at")
+    @classmethod
+    def utc_timestamps(cls, value):
+        return value.astimezone(UTC) if value is not None else None
+
+
 class DecisionView(Contract):
     id: str
     run_id: str
-    task_id: str
+    task_id: str | None
     attempt_id: str | None
-    kind: Literal["architecture_approval", "uncertain_outcome", "file_conflict"]
+    tool_run_id: str | None = None
+    kind: Literal[
+        "architecture_approval", "uncertain_outcome", "file_conflict", "tool_uncertain_outcome"
+    ]
     status: Literal["open", "resolved"]
     version: int = Field(ge=1)
     title: str
@@ -304,6 +357,7 @@ class Snapshot(Contract):
     decisions: list[DecisionView] = Field(default_factory=list)
     usage: UsageSummary | None = None
     candidate: CandidateView | None = None
+    tool_runs: list[ToolRunView] = Field(default_factory=list)
 
 
 class EventEnvelope(Contract):
@@ -343,6 +397,7 @@ class WorkflowUpdatedPayload(RunStatePayload):
     decisions: list[DecisionView]
     usage: UsageSummary
     candidate: CandidateView | None = None
+    tool_runs: list[ToolRunView] = Field(default_factory=list)
 
 
 class WorkflowUpdatedEvent(EventEnvelope):
@@ -451,7 +506,7 @@ class CommandReceiptView(Contract):
     scope: str
     key: str
     params_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
-    response: ProjectView | RunView
+    response: ProjectView | RunView | ToolRunView
     created_at: datetime
 
 
@@ -470,3 +525,4 @@ class ContractBundle(Contract):
     artifact_content: ArtifactContent
     attempt_trace: AttemptTrace
     file_proposal: FileProposal
+    tool_command: ToolCommand

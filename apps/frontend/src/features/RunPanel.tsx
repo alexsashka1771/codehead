@@ -13,8 +13,10 @@ export function RunPanel({ run, runs, snapshot, loading, pending, hasProject, co
   onSelectRun, onStart, onStartTest, onCommand }: Props) {
   const currentRun = snapshot?.run ?? run;
   const activeRun = runs.find((item) => !terminalStatuses.includes(item.id === currentRun?.id ? currentRun.status : item.status));
-  const canPause = currentRun && ['created', 'running'].includes(currentRun.status) && !currentRun.cancel_requested;
-  const canResume = currentRun?.status === 'paused' && !currentRun.cancel_requested;
+  const toolActive = snapshot?.tool_runs?.some(tool => ['created', 'running', 'uncertain'].includes(tool.status)) ?? false;
+  const canPause = currentRun && (['created', 'running'].includes(currentRun.status) || (currentRun.status === 'blocked' && toolActive))
+    && !currentRun.cancel_requested && !currentRun.pause_requested;
+  const canResume = currentRun && (currentRun.status === 'paused' || (currentRun.status === 'blocked' && currentRun.pause_requested && !toolActive)) && !currentRun.cancel_requested;
   const canCancel = currentRun && !terminalStatuses.includes(currentRun.status) && !currentRun.cancel_requested;
   const startDisabled = !hasProject || loading || Boolean(pending) || Boolean(activeRun);
   const inputTokens = usage?.input_tokens;
@@ -38,7 +40,7 @@ export function RunPanel({ run, runs, snapshot, loading, pending, hasProject, co
         {canCancel ? <button className="button text danger" type="button" disabled={Boolean(pending) || !connected} onClick={() => onCommand('cancel')}><Square size={13} />Отменить запуск</button> : null}
       </div>
       <p className="execution-note">{test ? currentRun?.workflow_version === 'clinic-v2'
-        ? 'Тестовый источник: пять ролей с заглушкой, без внешних LLM-вызовов. PM → Architect → CTO → Backend + Frontend. Исходный код кандидата сохраняется; QA, Runner и preview пока недоступны.'
+        ? 'Тестовый источник: пять ролей с заглушкой, без внешних LLM-вызовов. PM → Architect → CTO → Backend + Frontend. Проверки Runner доступны после сохранения кандидата и подключения worker. QA и preview пока недоступны.'
         : 'Тестовый источник: детерминированные документы, без внешних LLM-вызовов. PM → Architect → CTO.'
         : 'Live-генерация пока недоступна: провайдер не подключён. Тест запускается отдельной кнопкой.'}{!testAvailable ? ' ' + (testReason ?? 'Тестовый worker сейчас недоступен.') : ''}</p>
       <details className="run-limits"><summary>Лимиты запуска</summary><dl><div><dt>Параллельные задачи</dt><dd>{currentRun?.limits.max_parallel_tasks ?? 2}</dd></div><div><dt>Циклы исправления</dt><dd>{currentRun?.limits.max_repair_iterations ?? 2}</dd></div><div><dt>Вызовы LLM</dt><dd>{currentRun?.limits.max_llm_calls ?? 64}</dd></div><div><dt>Время</dt><dd>{Math.round((currentRun?.limits.max_duration_seconds ?? 1800) / 60)} мин</dd></div><div><dt>Бюджет</dt><dd>{currentRun?.limits.max_cost_usd != null ? `$${currentRun.limits.max_cost_usd}` : 'Не задан'}</dd></div></dl></details>

@@ -299,6 +299,8 @@ A05: тот же управляемый provider выдаёт две извес�
 | WS /api/runs/{run_id}/stream?after_seq= | Backfill и новые события | 1 |
 | POST /api/runs/{run_id}/commands | pause/resume/cancel; retry_failed после worker | 1/2 |
 | GET /api/runs/{run_id}/usage | Usage или явные неизвестные значения | 1/2 |
+| GET /api/runs/{run_id}/tools | Сохраняемые операции проверки версии кандидата | 4 |
+| POST /api/runs/{run_id}/tools/commands | Очередь доверенной проверки с workspace_id, snapshot_version и required_isolation | 4 |
 | GET /api/runs/{run_id}/artifacts | Список descriptor конкретного run | 3 |
 | GET /api/artifacts/{artifact_id} | Неизменяемые метаданные версии | 3 |
 | GET /api/artifacts/{artifact_id}/content | Содержимое с проверкой hash/media type | 3 |

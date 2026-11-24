@@ -124,7 +124,7 @@ test('persists first-role documents and decision; candidate approval does not ca
   await expect.poll(async () => (await snapshot(request, run.id)).run.status, { timeout: 15_000 }).toBe('blocked');
   const after = await snapshot(request, run.id);
   expect(after.run.status).toBe('blocked');
-  expect(after.run.blocked_reason).toMatch(/QA.*Runner.*preview/iu);
+  expect(after.run.blocked_reason).toMatch(/QA.*preview/iu);
   expect(after.decisions![0]).toMatchObject({ status: 'resolved', choice: 'approve', version: decision.version + 1 });
   expect(after.agent_runs).toHaveLength(5);
   for (const attempt of before.agent_runs!) expect(after.agent_runs!.find(item => item.id === attempt.id)).toEqual(attempt);

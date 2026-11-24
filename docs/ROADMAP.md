@@ -1,6 +1,6 @@
 # CodeHead — дорожная карта
 
-План следует [R01–R16](TECHNICAL_SPEC.md); критерии определены только в ТЗ. Даты — ориентиры, выполнение подтверждается отчётами. Текущий этап — [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md), кандидат — [CLINIC_REPORT](CLINIC_REPORT.md), worker — [WORKER_REPORT](WORKER_REPORT.md), история foundation — [STAGE_01_REPORT](STAGE_01_REPORT.md).
+План следует [R01–R16](TECHNICAL_SPEC.md); критерии определены только в ТЗ. Даты — ориентиры, выполнение подтверждается отчётами. Текущий этап — [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md), Runner — [RUNNER_REPORT](RUNNER_REPORT.md), кандидат — [CLINIC_REPORT](CLINIC_REPORT.md), worker — [WORKER_REPORT](WORKER_REPORT.md), история foundation — [STAGE_01_REPORT](STAGE_01_REPORT.md).
 
 ## Курсовая: семь сессий
 
@@ -18,9 +18,9 @@
 
 В сессиях 2–4 резервировать 60–90 минут на соответствующую интерфейсную контрольную точку и 30 минут на проверку; остаток — backend. В сессии 5 основное время отдано взаимодействиям и визуализации. Если UI-контрольная точка пропущена, это явный незакрытый результат сессии.
 
-## Ближайшая сессия после кандидата Clinic Demo
+## Ближайшая сессия после Runner 4.1
 
-1. Добавить ToolRun и RestrictedProcessRunner с process_only, очищенным окружением, таймаутами и остановкой своего дерева.
+1. Подключить QA к уже работающему ToolRun/RestrictedProcessRunner и сохранять карту проверки/разбор фактического отчёта; ручные Python/HTTP/build проверки уже доступны.
 2. Подключить внешний закреплённый HTTP-suite к QA и сохранить TestReport/Bug с хэшами кандидата/профиля/suite.
 3. Проверить настоящий red/green и две неудачные repair-попытки на отдельно помеченных defect fixtures; обычный кандидат дефект не содержит.
 4. Подключить DevOps, сборку и preview на отдельном origin с версией и фактическим health-check.

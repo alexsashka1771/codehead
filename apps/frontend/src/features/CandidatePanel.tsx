@@ -15,7 +15,7 @@ export function CandidatePanel({ snapshot, onSelectArtifact, onSelectAttempt }: 
     onClick={() => onSelectArtifact(id)}>{label}</button>;
   return <section className="candidate-panel" aria-label="Сохранённый кандидат" data-candidate-id={candidate.id} data-candidate-revision={candidate.revision}>
     <div className="decision-heading"><h3>Clinic Demo · версия {candidate.revision}</h3><span className="quiet-label">{statusLabels[candidate.status]}</span></div>
-    <p className="field-hint">QA, Runner и preview пока недоступны. Файлы доступны для просмотра; приложение из этой панели не запускается.</p>
+    <p className="field-hint">QA и preview пока недоступны. Проверки Runner доступны во вкладке «Проверки» после сохранения версии и подключения worker.</p>
     {candidate.blocked_reason ? <p className="attempt-error" role="status">{candidate.blocked_reason}</p> : null}
     <dl className="candidate-metadata">
       <div><dt>Профиль</dt><dd>{candidate.profile_version}</dd></div>

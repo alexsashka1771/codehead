@@ -88,7 +88,7 @@ for (const fallback of [false, true]) {
     expect(after.agent_runs!.find(attempt => attempt.id === ctoAttempt.id)).toEqual(ctoAttempt);
     expect(after.agent_runs!.every(attempt => attempt.status === 'succeeded' && attempt.provider === 'test')).toBe(true);
     expect(after.usage).toMatchObject({ source: 'test', request_count: 5, cost_usd: 0 });
-    expect(after.run.blocked_reason).toMatch(/QA.*Runner.*preview/iu);
+    expect(after.run.blocked_reason).toMatch(/QA.*preview/iu);
     expect(hydrateSnapshot(after).candidate).toEqual(candidate);
     expect(candidate.revision).toBe(3);
     const sources = candidate.files.filter(file => file.origin === 'test_injected');
@@ -156,7 +156,7 @@ for (const fallback of [false, true]) {
 
     let panel = await openCandidate(page);
     await expect(panel).toHaveAttribute('data-candidate-revision', '3');
-    await expect(panel).toContainText('QA, Runner и preview пока недоступны');
+    await expect(panel).toContainText('QA и preview пока недоступны');
     await expect(panel.locator('[data-candidate-file]')).toHaveCount(candidate.files.length);
     expect(await panel.locator('iframe').count()).toBe(0);
     for (const area of ['backend/', 'frontend/']) {

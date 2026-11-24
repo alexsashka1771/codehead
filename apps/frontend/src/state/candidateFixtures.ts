@@ -10,7 +10,7 @@ export function makeCandidateSnapshot(status: CandidateView['status'] = 'ready')
   snapshot.run = { ...snapshot.run, workflow_version: 'clinic-v2', mode: 'test', status: 'blocked', last_event_seq: 3,
     profile_version: 'clinic_demo/v1', profile_hash: 'a'.repeat(64), acceptance_suite_hash: 'b'.repeat(64),
     template_hash: 'c'.repeat(64),
-    blocked_reason: 'QA и DevOps ещё не исполняются worker. Runner и preview недоступны.' };
+    blocked_reason: 'QA и DevOps ещё не исполняются worker. Preview недоступен.' };
   snapshot.last_event_seq = 3;
   snapshot.tasks = roles.map((role, index) => ({ ...testTask, id: 'task-' + role, role, status: 'succeeded',
     dependencies: index ? ['task-' + roles[Math.min(index - 1, 2)]] : [],

@@ -13,7 +13,8 @@ describe('candidate inspection navigation', () => {
     expect(markup).toContain('data-candidate-revision="3"');
     for (const hash of [candidate.profile_hash, candidate.acceptance_suite_hash, candidate.template_hash, candidate.tree_hash, candidate.manifest_hash!]) expect(markup).toContain(hash);
     expect(markup).toContain('clinic_demo/v1');
-    expect(markup).toContain('QA, Runner и preview пока недоступны');
+    expect(markup).toContain('QA и preview пока недоступны');
+    expect(markup).toContain('Проверки Runner доступны во вкладке');
     for (const file of candidate.files) {
       expect(markup).toContain(file.relative_path);
       expect(markup).toContain(file.content_hash);

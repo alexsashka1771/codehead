@@ -971,6 +971,9 @@
             },
             {
               "$ref": "#/$defs/RunView"
+            },
+            {
+              "$ref": "#/$defs/ToolRunView"
             }
           ],
           "title": "Response"
@@ -1067,8 +1070,15 @@
           "type": "string"
         },
         "task_id": {
-          "title": "Task Id",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Task Id"
         },
         "attempt_id": {
           "anyOf": [
@@ -1081,11 +1091,24 @@
           ],
           "title": "Attempt Id"
         },
+        "tool_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Run Id"
+        },
         "kind": {
           "enum": [
             "architecture_approval",
             "uncertain_outcome",
-            "file_conflict"
+            "file_conflict",
+            "tool_uncertain_outcome"
           ],
           "title": "Kind",
           "type": "string"
@@ -2302,6 +2325,13 @@
             }
           ],
           "default": null
+        },
+        "tool_runs": {
+          "items": {
+            "$ref": "#/$defs/ToolRunView"
+          },
+          "title": "Tool Runs",
+          "type": "array"
         }
       },
       "required": [
@@ -2580,6 +2610,325 @@
       "title": "TaskView",
       "type": "object"
     },
+    "ToolCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "operation_id": {
+          "enum": [
+            "validate_backend",
+            "test_backend",
+            "build_frontend"
+          ],
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "workspace_id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "title": "Workspace Id",
+          "type": "string"
+        },
+        "snapshot_version": {
+          "minimum": 1,
+          "title": "Snapshot Version",
+          "type": "integer"
+        },
+        "required_isolation": {
+          "default": "process_only",
+          "enum": [
+            "process_only",
+            "container",
+            "remote"
+          ],
+          "title": "Required Isolation",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "default": 180,
+          "maximum": 180,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "output_limit_bytes": {
+          "default": 262144,
+          "maximum": 262144,
+          "minimum": 1024,
+          "title": "Output Limit Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "operation_id",
+        "workspace_id",
+        "snapshot_version"
+      ],
+      "title": "ToolCommand",
+      "type": "object"
+    },
+    "ToolRunView": {
+      "additionalProperties": false,
+      "properties": {
+        "operation_id": {
+          "enum": [
+            "validate_backend",
+            "test_backend",
+            "build_frontend"
+          ],
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "workspace_id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "title": "Workspace Id",
+          "type": "string"
+        },
+        "snapshot_version": {
+          "minimum": 1,
+          "title": "Snapshot Version",
+          "type": "integer"
+        },
+        "required_isolation": {
+          "default": "process_only",
+          "enum": [
+            "process_only",
+            "container",
+            "remote"
+          ],
+          "title": "Required Isolation",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "default": 180,
+          "maximum": 180,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "output_limit_bytes": {
+          "default": 262144,
+          "maximum": 262144,
+          "minimum": 1024,
+          "title": "Output Limit Bytes",
+          "type": "integer"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "created",
+            "running",
+            "succeeded",
+            "failed",
+            "timed_out",
+            "cancelled",
+            "uncertain"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "isolation_level": {
+          "const": "process_only",
+          "default": "process_only",
+          "title": "Isolation Level",
+          "type": "string"
+        },
+        "tree_hash": {
+          "title": "Tree Hash",
+          "type": "string"
+        },
+        "manifest_artifact_id": {
+          "title": "Manifest Artifact Id",
+          "type": "string"
+        },
+        "manifest_hash": {
+          "title": "Manifest Hash",
+          "type": "string"
+        },
+        "profile_version": {
+          "title": "Profile Version",
+          "type": "string"
+        },
+        "profile_hash": {
+          "title": "Profile Hash",
+          "type": "string"
+        },
+        "acceptance_suite_hash": {
+          "title": "Acceptance Suite Hash",
+          "type": "string"
+        },
+        "template_hash": {
+          "title": "Template Hash",
+          "type": "string"
+        },
+        "commands": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Commands",
+          "type": "array"
+        },
+        "stdout": {
+          "default": "",
+          "title": "Stdout",
+          "type": "string"
+        },
+        "stderr": {
+          "default": "",
+          "title": "Stderr",
+          "type": "string"
+        },
+        "report": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Report"
+        },
+        "exit_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exit Code"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Code"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Message"
+        },
+        "process_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Process Id"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started At"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        },
+        "fencing_token": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Fencing Token",
+          "type": "integer"
+        },
+        "lease_owner": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lease Owner"
+        },
+        "lease_expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lease Expires At"
+        }
+      },
+      "required": [
+        "operation_id",
+        "workspace_id",
+        "snapshot_version",
+        "id",
+        "run_id",
+        "status",
+        "tree_hash",
+        "manifest_artifact_id",
+        "manifest_hash",
+        "profile_version",
+        "profile_hash",
+        "acceptance_suite_hash",
+        "template_hash",
+        "created_at"
+      ],
+      "title": "ToolRunView",
+      "type": "object"
+    },
     "UsageSummary": {
       "additionalProperties": false,
       "properties": {
@@ -2841,6 +3190,13 @@
             }
           ],
           "default": null
+        },
+        "tool_runs": {
+          "items": {
+            "$ref": "#/$defs/ToolRunView"
+          },
+          "title": "Tool Runs",
+          "type": "array"
         }
       },
       "required": [
@@ -2900,6 +3256,9 @@
     },
     "file_proposal": {
       "$ref": "#/$defs/FileProposal"
+    },
+    "tool_command": {
+      "$ref": "#/$defs/ToolCommand"
     }
   },
   "required": [
@@ -2916,7 +3275,8 @@
     "decision_resolution",
     "artifact_content",
     "attempt_trace",
-    "file_proposal"
+    "file_proposal",
+    "tool_command"
   ],
   "title": "ContractBundle",
   "type": "object"

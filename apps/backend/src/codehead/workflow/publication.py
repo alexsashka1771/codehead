@@ -12,7 +12,7 @@ from codehead.errors import DomainError
 from codehead.persistence.candidates import candidate_view
 from codehead.persistence.models import Artifact, Candidate, Run
 
-NEXT_STAGE_REASON = "Следующий этап Clinic Demo ещё не подключён: QA, DevOps, Runner и preview."
+NEXT_STAGE_REASON = "Следующий этап Clinic Demo ещё не подключён: QA, DevOps и preview."
 
 
 @dataclass(frozen=True)

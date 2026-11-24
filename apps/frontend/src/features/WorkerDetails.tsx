@@ -131,11 +131,12 @@ export function DecisionCard({ decision, artifacts, pending, connected, onResolv
 }) {
   const [comment, setComment] = useState('');
   const [riskAccepted, setRiskAccepted] = useState(false);
-  const uncertain = decision.kind === 'uncertain_outcome';
+  const toolUncertain = decision.kind === 'tool_uncertain_outcome';
+  const uncertain = decision.kind === 'uncertain_outcome' || toolUncertain;
   const explanationMissing = uncertain && comment.trim().length < 10;
   const open = decision.status === 'open';
   const reconciliation = decision.blocking === false;
-  const choices = decision.choices.filter((choice): choice is DecisionResolution['choice'] => Object.hasOwn(choiceLabels, choice));
+  const choices = decision.choices.filter((choice): choice is DecisionResolution['choice'] => Object.hasOwn(choiceLabels, choice) && (!toolUncertain || choice === 'confirm_failed'));
   return <section className="decision-card" aria-label={decision.title} data-decision-id={decision.id} data-decision-version={decision.version}>
     <div className="decision-heading"><h3>{decision.title}</h3><span className="quiet-label">v{decision.version} · {open ? 'Ждёт ответа' : 'Решено'}</span></div>
     <p className="decision-summary">{decision.summary}</p>
@@ -145,11 +146,12 @@ export function DecisionCard({ decision, artifacts, pending, connected, onResolv
         onClick={() => onSelectArtifact(id)}><FileText size={14} />{artifact ? artifactLabel(artifact) + ' · v' + artifact.version : id}</button></li>;
     })}</ul> : null}
     {open ? <>
-      {reconciliation ? <p className="decision-risk">Сверка предыдущей отправки не останавливает новую работу. Пауза и отмена ожидают известного исхода старой попытки. Подтверждайте отказ только при известном результате.</p>
+      {toolUncertain ? <p className="decision-risk">Исход локального процесса неизвестен. Проверьте, что процесс остановлен, и объясните, как вы это установили. Подтверждение сохранит проверку как неуспешную; автоматического повторного запуска нет.</p>
+        : reconciliation ? <p className="decision-risk">Сверка предыдущей отправки не останавливает новую работу. Пауза и отмена ожидают известного исхода старой попытки. Подтверждайте отказ только при известном результате.</p>
         : uncertain ? <p className="decision-risk">Исход предыдущей отправки неизвестен. Повтор может создать дублирующий вызов и дополнительные расходы. Подтверждайте отказ только при известном результате.</p>
         : decision.kind === 'file_conflict' ? <p className="field-hint">Набор файлов не применён. Повтор получит актуальную основу и создаст новую попытку инженера.</p>
         : <p className="field-hint">Принятие завершит оценку CTO без нового вызова провайдера. {sourceEnabled
-          ? 'Backend и Frontend подготовят исходный код кандидата. QA, Runner и preview пока недоступны.'
+          ? 'Backend и Frontend подготовят исходный код кандидата. Проверки Runner доступны во вкладке «Проверки» после сохранения версии и подключения worker. QA и preview пока недоступны.'
           : 'Разработка Clinic Demo на следующем этапе пока недоступна.'}</p>}
       <label className="decision-comment"><span>{uncertain ? 'Объяснение · минимум 10 символов' : 'Комментарий к решению (необязательно)'}</span>
         <textarea value={comment} onChange={event => setComment(event.target.value)} rows={2} maxLength={4000} disabled={pending} />
@@ -159,10 +161,10 @@ export function DecisionCard({ decision, artifacts, pending, connected, onResolv
       <div className="decision-actions">{choices.map(choice => <button key={choice} type="button"
         className={'button ' + (choice === 'approve' ? 'primary' : choice === 'reject' ? 'text danger' : 'secondary')}
         disabled={pending || !connected || explanationMissing || (choice === 'retry_with_risk' && !riskAccepted)}
-        onClick={() => void onResolve(decision, choice, comment.trim())}>{decision.kind === 'file_conflict' && choice === 'reject' ? 'Отклонить набор файлов' : choiceLabels[choice]}</button>)}</div>
+        onClick={() => void onResolve(decision, choice, comment.trim())}>{toolUncertain && choice === 'confirm_failed' ? 'Подтвердить остановку' : decision.kind === 'file_conflict' && choice === 'reject' ? 'Отклонить набор файлов' : choiceLabels[choice]}</button>)}</div>
       {!connected ? <p className="field-hint">Для ответа восстановите соединение с сервером.</p> : null}
       {pending ? <p role="status" className="field-hint">Сохраняем решение…</p> : null}
-    </> : <><p className="decision-result" role="status">{decision.kind === 'file_conflict' && decision.choice === 'reject' ? 'Набор файлов отклонён' : resolvedLabels[decision.choice ?? ''] ?? decision.choice ?? 'Решение сохранено'}{decision.comment ? ' · ' + decision.comment : ''}</p>
+    </> : <><p className="decision-result" role="status">{toolUncertain && decision.choice === 'confirm_failed' ? 'Остановка процесса подтверждена' : decision.kind === 'file_conflict' && decision.choice === 'reject' ? 'Набор файлов отклонён' : resolvedLabels[decision.choice ?? ''] ?? decision.choice ?? 'Решение сохранено'}{decision.comment ? ' · ' + decision.comment : ''}</p>
       {decision.resolved_at ? <p className="field-hint">Сохранено <time dateTime={decision.resolved_at}>{formatTime(decision.resolved_at, true)}</time></p> : null}</>}
   </section>;
 }

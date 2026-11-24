@@ -117,9 +117,10 @@ export type TraceAvailable = boolean;
 export type AgentRuns = AgentRunView[];
 export type Id6 = string;
 export type RunId4 = string;
-export type TaskId2 = string;
+export type TaskId2 = string | null;
 export type AttemptId = string | null;
-export type Kind = 'architecture_approval' | 'uncertain_outcome' | 'file_conflict';
+export type ToolRunId = string | null;
+export type Kind = 'architecture_approval' | 'uncertain_outcome' | 'file_conflict' | 'tool_uncertain_outcome';
 export type Status1 = 'open' | 'resolved';
 export type Version1 = number;
 export type Title = string;
@@ -170,10 +171,44 @@ export type WorkspacePath = string | null;
 export type BlockedReason2 = string | null;
 export type ManifestHash = string | null;
 export type ManifestByteSize = number | null;
+export type OperationId = 'validate_backend' | 'test_backend' | 'build_frontend';
+export type WorkspaceId = string;
+export type SnapshotVersion = number;
+export type RequiredIsolation = 'process_only' | 'container' | 'remote';
+export type TimeoutSeconds = number;
+export type OutputLimitBytes = number;
+export type Id8 = string;
+export type RunId6 = string;
+export type Status3 = 'created' | 'running' | 'succeeded' | 'failed' | 'timed_out' | 'cancelled' | 'uncertain';
+export type IsolationLevel = 'process_only';
+export type TreeHash1 = string;
+export type ManifestArtifactId1 = string;
+export type ManifestHash1 = string;
+export type ProfileVersion2 = string;
+export type ProfileHash2 = string;
+export type AcceptanceSuiteHash2 = string;
+export type TemplateHash2 = string;
+export type Commands = string[][];
+export type Stdout = string;
+export type Stderr = string;
+export type Report = {
+  [k: string]: unknown;
+} | null;
+export type ExitCode = number | null;
+export type ErrorCode1 = string | null;
+export type ErrorMessage1 = string | null;
+export type ProcessId = number | null;
+export type CreatedAt7 = string;
+export type StartedAt2 = string | null;
+export type FinishedAt2 = string | null;
+export type FencingToken2 = number;
+export type LeaseOwner1 = string | null;
+export type LeaseExpiresAt1 = string | null;
+export type ToolRuns = ToolRunView[];
 export type EventId = string;
 export type SchemaVersion1 = 1;
 export type ProjectId1 = string;
-export type RunId6 = string;
+export type RunId7 = string;
 export type Seq = number;
 export type OccurredAt = string;
 export type ActorId = string | null;
@@ -185,7 +220,7 @@ export type Agents1 = AgentView[];
 export type EventId1 = string;
 export type SchemaVersion2 = 1;
 export type ProjectId2 = string;
-export type RunId7 = string;
+export type RunId8 = string;
 export type Seq1 = number;
 export type OccurredAt1 = string;
 export type ActorId1 = string | null;
@@ -196,7 +231,7 @@ export type EventType1 = 'task.queued';
 export type EventId2 = string;
 export type SchemaVersion3 = 1;
 export type ProjectId3 = string;
-export type RunId8 = string;
+export type RunId9 = string;
 export type Seq2 = number;
 export type OccurredAt2 = string;
 export type ActorId2 = string | null;
@@ -209,7 +244,7 @@ export type Agents2 = AgentView[];
 export type EventId3 = string;
 export type SchemaVersion4 = 1;
 export type ProjectId4 = string;
-export type RunId9 = string;
+export type RunId10 = string;
 export type Seq3 = number;
 export type OccurredAt3 = string;
 export type ActorId3 = string | null;
@@ -220,7 +255,7 @@ export type EventType3 = 'run.pausing';
 export type EventId4 = string;
 export type SchemaVersion5 = 1;
 export type ProjectId5 = string;
-export type RunId10 = string;
+export type RunId11 = string;
 export type Seq4 = number;
 export type OccurredAt4 = string;
 export type ActorId4 = string | null;
@@ -231,7 +266,7 @@ export type EventType4 = 'run.resumed';
 export type EventId5 = string;
 export type SchemaVersion6 = 1;
 export type ProjectId6 = string;
-export type RunId11 = string;
+export type RunId12 = string;
 export type Seq5 = number;
 export type OccurredAt5 = string;
 export type ActorId5 = string | null;
@@ -242,7 +277,7 @@ export type EventType5 = 'run.cancelled';
 export type EventId6 = string;
 export type SchemaVersion7 = 1;
 export type ProjectId7 = string;
-export type RunId12 = string;
+export type RunId13 = string;
 export type Seq6 = number;
 export type OccurredAt6 = string;
 export type ActorId6 = string | null;
@@ -256,6 +291,7 @@ export type Action = string;
 export type Artifacts1 = ArtifactView[];
 export type AgentRuns1 = AgentRunView[];
 export type Decisions1 = DecisionView[];
+export type ToolRuns1 = ToolRunView[];
 export type Events = (
   | RunCreatedEvent
   | TaskQueuedEvent
@@ -269,8 +305,8 @@ export type NextAfterSeq = number;
 export type HasMore = boolean;
 export type LastEventSeq2 = number;
 export type Stage = 'foundation' | 'worker';
-export type Id8 = string;
-export type Status3 = 'available' | 'planned' | 'disabled' | 'degraded';
+export type Id9 = string;
+export type Status4 = 'available' | 'planned' | 'disabled' | 'degraded';
 export type Reason = string | null;
 export type Capabilities = Capability[];
 export type Name2 = string;
@@ -286,8 +322,8 @@ export type CommandToken = string;
 export type Scope = string;
 export type Key = string;
 export type ParamsHash = string;
-export type Response = ProjectView | RunView;
-export type CreatedAt7 = string;
+export type Response = ProjectView | RunView | ToolRunView;
+export type CreatedAt8 = string;
 export type Version3 = number;
 export type Choice1 = 'approve' | 'reject' | 'confirm_failed' | 'retry_with_risk' | 'retry_files';
 export type Comment1 = string;
@@ -305,6 +341,12 @@ export type RelativePath2 = string;
 export type BaseHash = string | null;
 export type MediaType3 = string;
 export type Content1 = string;
+export type OperationId1 = 'validate_backend' | 'test_backend' | 'build_frontend';
+export type WorkspaceId1 = string;
+export type SnapshotVersion1 = number;
+export type RequiredIsolation1 = 'process_only' | 'container' | 'remote';
+export type TimeoutSeconds1 = number;
+export type OutputLimitBytes1 = number;
 
 export interface ContractBundle {
   create_project: CreateProject;
@@ -321,6 +363,7 @@ export interface ContractBundle {
   artifact_content: ArtifactContent;
   attempt_trace: AttemptTrace;
   file_proposal: FileProposal;
+  tool_command: ToolCommand;
 }
 export interface CreateProject {
   name: Name;
@@ -357,6 +400,7 @@ export interface Snapshot {
   decisions?: Decisions;
   usage?: UsageSummary | null;
   candidate?: CandidateView | null;
+  tool_runs?: ToolRuns;
 }
 export interface ProjectView {
   name: Name1;
@@ -480,6 +524,7 @@ export interface DecisionView {
   run_id: RunId4;
   task_id: TaskId2;
   attempt_id: AttemptId;
+  tool_run_id?: ToolRunId;
   kind: Kind;
   status: Status1;
   version: Version1;
@@ -542,6 +587,39 @@ export interface CandidateFileView {
 export interface InputVersions3 {
   [k: string]: number;
 }
+export interface ToolRunView {
+  operation_id: OperationId;
+  workspace_id: WorkspaceId;
+  snapshot_version: SnapshotVersion;
+  required_isolation?: RequiredIsolation;
+  timeout_seconds?: TimeoutSeconds;
+  output_limit_bytes?: OutputLimitBytes;
+  id: Id8;
+  run_id: RunId6;
+  status: Status3;
+  isolation_level?: IsolationLevel;
+  tree_hash: TreeHash1;
+  manifest_artifact_id: ManifestArtifactId1;
+  manifest_hash: ManifestHash1;
+  profile_version: ProfileVersion2;
+  profile_hash: ProfileHash2;
+  acceptance_suite_hash: AcceptanceSuiteHash2;
+  template_hash: TemplateHash2;
+  commands?: Commands;
+  stdout?: Stdout;
+  stderr?: Stderr;
+  report?: Report;
+  exit_code?: ExitCode;
+  error_code?: ErrorCode1;
+  error_message?: ErrorMessage1;
+  process_id?: ProcessId;
+  created_at: CreatedAt7;
+  started_at?: StartedAt2;
+  finished_at?: FinishedAt2;
+  fencing_token?: FencingToken2;
+  lease_owner?: LeaseOwner1;
+  lease_expires_at?: LeaseExpiresAt1;
+}
 export interface EventsPage {
   events: Events;
   next_after_seq: NextAfterSeq;
@@ -552,7 +630,7 @@ export interface RunCreatedEvent {
   event_id: EventId;
   schema_version?: SchemaVersion1;
   project_id: ProjectId1;
-  run_id: RunId6;
+  run_id: RunId7;
   seq: Seq;
   occurred_at: OccurredAt;
   actor_id: ActorId;
@@ -572,7 +650,7 @@ export interface TaskQueuedEvent {
   event_id: EventId1;
   schema_version?: SchemaVersion2;
   project_id: ProjectId2;
-  run_id: RunId7;
+  run_id: RunId8;
   seq: Seq1;
   occurred_at: OccurredAt1;
   actor_id: ActorId1;
@@ -589,7 +667,7 @@ export interface RunPausedEvent {
   event_id: EventId2;
   schema_version?: SchemaVersion3;
   project_id: ProjectId3;
-  run_id: RunId8;
+  run_id: RunId9;
   seq: Seq2;
   occurred_at: OccurredAt2;
   actor_id: ActorId2;
@@ -608,7 +686,7 @@ export interface RunPausingEvent {
   event_id: EventId3;
   schema_version?: SchemaVersion4;
   project_id: ProjectId4;
-  run_id: RunId9;
+  run_id: RunId10;
   seq: Seq3;
   occurred_at: OccurredAt3;
   actor_id: ActorId3;
@@ -622,7 +700,7 @@ export interface RunResumedEvent {
   event_id: EventId4;
   schema_version?: SchemaVersion5;
   project_id: ProjectId5;
-  run_id: RunId10;
+  run_id: RunId11;
   seq: Seq4;
   occurred_at: OccurredAt4;
   actor_id: ActorId4;
@@ -636,7 +714,7 @@ export interface RunCancelledEvent {
   event_id: EventId5;
   schema_version?: SchemaVersion6;
   project_id: ProjectId6;
-  run_id: RunId11;
+  run_id: RunId12;
   seq: Seq5;
   occurred_at: OccurredAt5;
   actor_id: ActorId5;
@@ -650,7 +728,7 @@ export interface WorkflowUpdatedEvent {
   event_id: EventId6;
   schema_version?: SchemaVersion7;
   project_id: ProjectId7;
-  run_id: RunId12;
+  run_id: RunId13;
   seq: Seq6;
   occurred_at: OccurredAt6;
   actor_id: ActorId6;
@@ -670,6 +748,7 @@ export interface WorkflowUpdatedPayload {
   decisions: Decisions1;
   usage: UsageSummary;
   candidate?: CandidateView | null;
+  tool_runs?: ToolRuns1;
 }
 export interface CapabilitiesResponse {
   stage?: Stage;
@@ -677,8 +756,8 @@ export interface CapabilitiesResponse {
   roles: Roles;
 }
 export interface Capability {
-  id: Id8;
-  status: Status3;
+  id: Id9;
+  status: Status4;
   reason: Reason;
 }
 export interface RoleDefinition {
@@ -703,7 +782,7 @@ export interface CommandReceiptView {
   key: Key;
   params_hash: ParamsHash;
   response: Response;
-  created_at: CreatedAt7;
+  created_at: CreatedAt8;
 }
 export interface DecisionResolution {
   version: Version3;
@@ -737,6 +816,14 @@ export interface FileProposal {
   base_hash?: BaseHash;
   media_type?: MediaType3;
   content: Content1;
+}
+export interface ToolCommand {
+  operation_id: OperationId1;
+  workspace_id: WorkspaceId1;
+  snapshot_version: SnapshotVersion1;
+  required_isolation?: RequiredIsolation1;
+  timeout_seconds?: TimeoutSeconds1;
+  output_limit_bytes?: OutputLimitBytes1;
 }
 
 export type DomainEvent = EventsPage['events'][number];

@@ -24,10 +24,13 @@ from codehead.contracts import (
     SessionInfo,
     Snapshot,
     StartRun,
+    ToolCommand,
+    ToolRunView,
     UsageSummary,
 )
 from codehead.errors import DomainError
 from codehead.persistence.service import ProjectService
+from codehead.persistence.tools import SUPPORTED_TOOLS
 from codehead.workflow.definition import ROLE_DEFINITIONS
 
 router = APIRouter()
@@ -62,12 +65,14 @@ def database_status(request: Request) -> str:
     return "ready"
 
 
-def worker_ready(request: Request, *, required_roles=()) -> bool:
+def worker_ready(request: Request, *, required_roles=(), required_tools=()) -> bool:
     service = request.app.state.service
     if service is None:
         return False
     try:
-        return service.worker_connected(required_roles=required_roles)
+        return service.worker_connected(
+            required_roles=required_roles, required_tools=required_tools
+        )
     except OperationalError:
         return False
 
@@ -96,6 +101,7 @@ def capabilities(request: Request):
         request, required_roles=("product_manager", "architect", "cto")
     )
     engineers = ready and worker_ready(request, required_roles=("backend", "frontend"))
+    runner = ready and worker_ready(request, required_tools=SUPPORTED_TOOLS)
     return CapabilitiesResponse(
         stage="worker" if connected else "foundation",
         roles=list(ROLE_DEFINITIONS),
@@ -146,7 +152,17 @@ def capabilities(request: Request):
                 reason="Live-провайдер не подключён. Заглушка доступна в тестовом режиме.",
             ),
             Capability(
-                id="runner", status="planned", reason="Проверки и preview ещё не реализованы."
+                id="runner",
+                status="available" if runner else "disabled",
+                reason=(
+                    "Ручные validate_backend, test_backend и build_frontend "
+                    "для тестового кандидата; process_only. QA и preview ещё не подключены."
+                )
+                if runner
+                else (
+                    "Worker с validate_backend, test_backend и build_frontend не подключён; "
+                    "QA и preview ещё не подключены."
+                ),
             ),
             Capability(
                 id="replay",
@@ -254,6 +270,22 @@ def artifacts(run_id: ResourceId, service: Service):
 @router.get("/api/runs/{run_id}/candidate", response_model=CandidateView | None)
 def candidate(run_id: ResourceId, service: Service):
     return service.candidate(run_id)
+
+
+@router.get("/api/runs/{run_id}/tools", response_model=list[ToolRunView])
+def tool_runs(run_id: ResourceId, service: Service):
+    return service.tool_runs(run_id)
+
+
+@router.post("/api/runs/{run_id}/tools/commands", response_model=ToolRunView, status_code=202)
+def tool_command(
+    run_id: ResourceId,
+    command: ToolCommand,
+    request: Request,
+    service: Service,
+    idempotency_key: CommandKey,
+):
+    return service.queue_tool(run_id, command, idempotency_key, request.state.correlation_id)
 
 
 @router.get("/api/agent-runs/{attempt_id}/trace", response_model=AttemptTrace)

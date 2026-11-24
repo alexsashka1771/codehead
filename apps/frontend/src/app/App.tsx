@@ -52,6 +52,12 @@ export function App() {
   const visibleError = connectionError ?? workspace.actionError;
   const showForm = createOpen || (!workspace.project && !workspace.loading && !workspace.error);
   const currentRun = stream.snapshot?.run ?? workspace.run;
+  const currentSnapshot = useRef(stream.snapshot);
+  currentSnapshot.current = stream.snapshot;
+  useEffect(() => { workspace.observeToolSnapshot(stream.snapshot); }, [stream.snapshot, workspace.observeToolSnapshot]);
+  const awaitingToolEvent = workspace.acceptedTools.some(accepted => accepted.runId === stream.snapshot?.run.id
+    && accepted.candidateId === stream.snapshot.candidate?.id && accepted.revision === stream.snapshot.candidate.revision
+    && !stream.snapshot.tool_runs?.some(tool => tool.id === accepted.toolRunId));
   const testCapability = workspace.capabilities?.capabilities.find(capability => capability.id === 'test_execution');
 
   useEffect(() => {
@@ -139,6 +145,10 @@ export function App() {
     const saved = await workspace.resolveDecision(decision, choice, comment);
     stream.reconnect();
     return saved;
+  }
+  async function queueTool(command: Parameters<typeof workspace.queueTool>[1]) {
+    if (!stream.snapshot || !connected) return false;
+    return workspace.queueTool(stream.snapshot, command, () => currentSnapshot.current);
   }
 
   return <div className="app" data-theme={night ? 'night' : 'day'} data-has-error={Boolean(visibleError)} data-run-mode={currentRun?.mode ?? ''}>
@@ -245,7 +255,8 @@ export function App() {
         onSelect={selectRole} hasRun={Boolean(stream.snapshot)} />
       <Inspector snapshot={stream.snapshot} events={stream.events} capabilities={workspace.capabilities}
         loading={Boolean(workspace.selection.runId) && !stream.snapshot && connectionBusy}
-        expanded={dataOpen} onExpandedChange={showData} connected={connected} pending={Boolean(workspace.pending)} onResolve={resolveDecision} />
+        expanded={dataOpen} onExpandedChange={showData} connected={connected} pending={Boolean(workspace.pending)} onResolve={resolveDecision}
+        onQueueTool={queueTool} awaitingToolEvent={awaitingToolEvent} />
     </main>
     <footer className="statusbar">
       <span><Database size={12} />{workspace.error ? 'Сервер недоступен' : workspace.loading ? 'Подключаем хранилище' : 'Данные сохраняются на сервере'}</span>

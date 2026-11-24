@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from codehead.clinic.files import InvalidFile
 from codehead.errors import DomainError
 from codehead.llm.provider import ProviderFailure
+from codehead.workflow.tool_worker import ToolWorker
 
 
 class Worker:
@@ -18,6 +19,10 @@ class Worker:
         self.service.register(self.owner)
         recovered = self.service.recover()
         accepted = self.service.accept_decisions()
+        tool = self.service.claim_tool(self.owner)
+        if tool is not None:
+            ToolWorker(self.service).execute(tool)
+            return True
         publication = self.service.claim_publication(self.owner)
         if publication is not None:
             self._publish(publication)

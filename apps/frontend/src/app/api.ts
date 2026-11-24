@@ -1,7 +1,7 @@
 import type {
   AgentRunView, ApiProblem, ArtifactContent, ArtifactView, AttemptTrace, CapabilitiesResponse,
   CandidateView, CreateProject, DecisionResolution, DecisionView, EventsPage, ProjectView,
-  RunCommand, RunView, SessionInfo, Snapshot, StartRun, UsageSummary,
+  RunCommand, RunView, SessionInfo, Snapshot, StartRun, ToolCommand, ToolRunView, UsageSummary,
 } from '../../../../packages/contracts';
 
 export class ApiError extends Error {
@@ -75,6 +75,8 @@ export const api = {
   start: (projectId: string, key: string, mode: StartRun['mode'] = 'live') => post<RunView>(`/api/projects/${encodeURIComponent(projectId)}/runs`, { ...startParameters, mode }, key),
   snapshot: (runId: string, signal?: AbortSignal) => request<Snapshot>(`/api/runs/${encodeURIComponent(runId)}/snapshot`, { signal }),
   candidate: (runId: string, signal?: AbortSignal) => request<CandidateView | null>(`/api/runs/${encodeURIComponent(runId)}/candidate`, { signal }),
+  tools: (runId: string, signal?: AbortSignal) => request<ToolRunView[]>(`/api/runs/${encodeURIComponent(runId)}/tools`, { signal }),
+  queueTool: (runId: string, command: ToolCommand, key: string) => post<ToolRunView>(`/api/runs/${encodeURIComponent(runId)}/tools/commands`, command, key),
   artifacts: (runId: string, signal?: AbortSignal) => request<ArtifactView[]>(`/api/runs/${encodeURIComponent(runId)}/artifacts`, { signal }),
   events: (runId: string, after: number, signal?: AbortSignal) => request<EventsPage>(`/api/runs/${encodeURIComponent(runId)}/events?after_seq=${after}&limit=100`, { signal }),
   command: (runId: string, command: RunCommand['command'], key: string) => post<RunView>(`/api/runs/${encodeURIComponent(runId)}/commands`, { command }, key),

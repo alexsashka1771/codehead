@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CapabilitiesResponse, CreateProject, DecisionResolution, DecisionView, ProjectView, RunCommand, RunView, StartRun } from '../../../../packages/contracts';
+import type { CapabilitiesResponse, CreateProject, DecisionResolution, DecisionView, ProjectView, RunCommand, RunView, Snapshot, StartRun, ToolCommand } from '../../../../packages/contracts';
 import { api, ApiError, errorMessage } from '../app/api';
 import { readSelection, saveSelection, type Selection } from './selection';
 import { mergeRunHistory } from './runHistory';
+
+interface AcceptedTool {
+  runId: string;
+  candidateId: string;
+  revision: number;
+  operationId: ToolCommand['operation_id'];
+  toolRunId: string;
+}
 
 export function useWorkspace() {
   const [selection, setSelection] = useState<Selection>(readSelection);
@@ -21,12 +29,29 @@ export function useWorkspace() {
   const runMutationVersions = useRef(new Map<string, number>());
   const startIntent = useRef<{ projectId: string; mode: StartRun['mode']; key: string } | null>(null);
   const decisionIntent = useRef<{ fingerprint: string; key: string } | null>(null);
+  const toolIntents = useRef(new Map<string, string>());
+  const acceptedToolIntents = useRef(new Map<string, AcceptedTool>());
+  const [acceptedTools, setAcceptedTools] = useState<AcceptedTool[]>([]);
+  const selectionVersion = useRef(0);
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
+  const observeToolSnapshot = useCallback((snapshot: Snapshot | null) => {
+    if (!snapshot) return;
+    let changed = false;
+    for (const [scope, accepted] of acceptedToolIntents.current) {
+      if (accepted.runId === snapshot.run.id && snapshot.tool_runs?.some(tool => tool.id === accepted.toolRunId
+        && tool.run_id === accepted.runId && tool.workspace_id === accepted.candidateId && tool.snapshot_version === accepted.revision
+        && tool.operation_id === accepted.operationId)) {
+        acceptedToolIntents.current.delete(scope);
+        changed = true;
+      }
+    }
+    if (changed) setAcceptedTools([...acceptedToolIntents.current.values()]);
+  }, []);
 
   useEffect(() => { saveSelection(selection); }, [selection]);
   useEffect(() => {
-    const onPopState = () => setSelection(readSelection());
+    const onPopState = () => { selectionVersion.current += 1; setSelection(readSelection()); };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -82,8 +107,8 @@ export function useWorkspace() {
     return () => controller.abort();
   }, [selection.projectId, revision]);
 
-  function selectProject(projectId: string) { setSelection({ projectId, runId: null }); }
-  function selectRun(runId: string) { setSelection((previous) => ({ ...previous, runId })); setActionError(null); }
+  function selectProject(projectId: string) { selectionVersion.current += 1; selectionRef.current = { projectId, runId: null }; setSelection(selectionRef.current); }
+  function selectRun(runId: string) { selectionVersion.current += 1; selectionRef.current = { ...selectionRef.current, runId }; setSelection(selectionRef.current); setActionError(null); }
 
   function recordRunMutation(run: RunView) {
     const projectId = run.project_id;
@@ -163,10 +188,54 @@ export function useWorkspace() {
     } finally { pendingRef.current = false; setPending(null); }
   }
 
+  async function queueTool(snapshot: Snapshot, command: ToolCommand, getCurrentSnapshot: () => Snapshot | null = () => snapshot) {
+    const runId = selectionRef.current.runId;
+    const candidate = snapshot.candidate;
+    if (pendingRef.current || runId !== snapshot.run.id || !candidate || candidate.run_id !== runId
+      || candidate.status !== 'ready' || snapshot.run.mode !== 'test' || snapshot.run.workflow_version !== 'clinic-v2'
+      || snapshot.run.pause_requested || snapshot.run.cancel_requested || ['paused', 'pausing', 'cancelled', 'failed', 'succeeded'].includes(snapshot.run.status)
+      || command.workspace_id !== candidate.id || command.snapshot_version !== candidate.revision) return false;
+    observeToolSnapshot(snapshot);
+    const scope = JSON.stringify([runId, candidate.id, candidate.revision, command.operation_id]);
+    if (acceptedToolIntents.current.has(scope)) return false;
+    pendingRef.current = true;
+    const version = selectionVersion.current;
+    const current = () => {
+      const latest = getCurrentSnapshot();
+      return selectionVersion.current === version && selectionRef.current.runId === runId && latest?.run.id === runId
+        && latest.candidate?.id === candidate.id && latest.candidate.revision === candidate.revision;
+    };
+    setPending('tool-' + command.operation_id); setActionError(null);
+    const fingerprint = JSON.stringify({ runId, ...command });
+    if (!toolIntents.current.has(fingerprint)) toolIntents.current.set(fingerprint, crypto.randomUUID());
+    try {
+      const receipt = await api.queueTool(runId, command, toolIntents.current.get(fingerprint)!);
+      if (receipt.run_id !== runId || receipt.workspace_id !== candidate.id || receipt.snapshot_version !== candidate.revision
+        || receipt.operation_id !== command.operation_id || receipt.manifest_artifact_id !== candidate.manifest_artifact_id
+        || receipt.manifest_hash !== candidate.manifest_hash || receipt.tree_hash !== candidate.tree_hash
+        || receipt.profile_hash !== candidate.profile_hash || receipt.profile_version !== candidate.profile_version
+        || receipt.acceptance_suite_hash !== candidate.acceptance_suite_hash || receipt.template_hash !== candidate.template_hash) {
+        if (current()) setActionError('Ответ проверки не соответствует выбранному запуску и версии кандидата. Обновите данные.');
+        return false;
+      }
+      toolIntents.current.delete(fingerprint);
+      acceptedToolIntents.current.set(scope, { runId, candidateId: candidate.id, revision: candidate.revision,
+        operationId: command.operation_id, toolRunId: receipt.id });
+      setAcceptedTools([...acceptedToolIntents.current.values()]);
+      observeToolSnapshot(getCurrentSnapshot());
+      // The receipt acknowledges enqueueing; only the event stream changes the snapshot.
+      return current();
+    } catch (cause) {
+      if (cause instanceof ApiError && !cause.problem.retriable) toolIntents.current.delete(fingerprint);
+      if (current()) setActionError(errorMessage(cause));
+      return false;
+    } finally { pendingRef.current = false; setPending(null); }
+  }
+
   return {
-    projects, runs, capabilities, loading, runsLoading, error, actionError, pending, selection,
+    projects, runs, capabilities, loading, runsLoading, error, actionError, pending, selection, acceptedTools,
     project: projects.find((project) => project.id === selection.projectId) ?? null,
     run: runs.find((run) => run.id === selection.runId) ?? null,
-    selectProject, selectRun, createProject, start, command, resolveDecision, refresh,
+    selectProject, selectRun, createProject, start, command, resolveDecision, queueTool, observeToolSnapshot, refresh,
   };
 }

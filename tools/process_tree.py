@@ -161,7 +161,7 @@ class WindowsJob:
 
 
 class ProcessTree:
-    def __init__(self, command, *, cwd, env):
+    def __init__(self, command, *, cwd, env, stdout=None, stderr=None):
         self._process = None
         self._job = None
         try:
@@ -176,6 +176,8 @@ class ProcessTree:
                     cwd=cwd,
                     env=env,
                     stdin=subprocess.PIPE,
+                    stdout=stdout,
+                    stderr=stderr,
                     bufsize=0,
                     creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP,
                     shell=False,
@@ -185,7 +187,9 @@ class ProcessTree:
                 self._process.stdin.write(b"start\n")
                 self._process.stdin.close()
             else:
-                self._process = subprocess.Popen(command, cwd=cwd, env=env, shell=False)
+                self._process = subprocess.Popen(
+                    command, cwd=cwd, env=env, shell=False, stdout=stdout, stderr=stderr
+                )
         except BaseException:
             self.stop()
             raise
@@ -193,6 +197,14 @@ class ProcessTree:
     @property
     def pid(self):
         return self._process.pid
+
+    @property
+    def stdout(self):
+        return self._process.stdout
+
+    @property
+    def stderr(self):
+        return self._process.stderr
 
     def poll(self):
         return self._process.poll()

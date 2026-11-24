@@ -37,6 +37,7 @@ from codehead.contracts import (
     TaskQueuedEvent,
     TaskQueuedPayload,
     TaskView,
+    ToolRunView,
     UsageSummary,
     WorkflowUpdatedEvent,
     WorkflowUpdatedPayload,
@@ -57,6 +58,7 @@ from codehead.persistence.models import (
     Task,
     WorkerHeartbeat,
 )
+from codehead.persistence.tools import ToolTransactions
 from codehead.workflow.definition import (
     DEPENDENCIES,
     ROLE_DEFINITIONS,
@@ -94,7 +96,7 @@ def payload_hash(payload) -> str:
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
-class ProjectService:
+class ProjectService(ToolTransactions):
     def __init__(self, database: Database):
         self.database = database
         self.clock = now
@@ -266,6 +268,7 @@ class ProjectService:
             ],
             usage=self._usage(session, run),
             candidate=candidate_view(session, run.id),
+            tool_runs=[ToolRunView.model_validate(tool) for tool in self._tools(session, run.id)],
         )
 
     def _emit_workflow(
@@ -283,7 +286,13 @@ class ProjectService:
 
     def _settle_control(self, session, run):
         attempts = self._attempts(session, run.id)
+        tools = self._tools(session, run.id)
         if run.pause_requested or run.cancel_requested:
+            for tool in tools:
+                if tool.status == "created":
+                    tool.status, tool.finished_at = "cancelled", self.clock()
+                    tool.lease_owner, tool.lease_expires_at = None, None
+                    tool.fencing_token += 1
             candidate = session.scalar(select(Candidate).where(Candidate.run_id == run.id))
             if candidate is not None:
                 if candidate.publication_owner is not None:
@@ -307,8 +316,12 @@ class ProjectService:
                     task.record_version += 1
                     agent = session.get(Agent, attempt.agent_id)
                     agent.lifecycle, agent.activity, agent.current_task_id = "idle", None, None
-        running = any(attempt.status == "running" for attempt in attempts)
-        uncertain = any(attempt.status == "uncertain" for attempt in attempts)
+        running = any(attempt.status == "running" for attempt in attempts) or any(
+            tool.status == "running" for tool in tools
+        )
+        uncertain = any(attempt.status == "uncertain" for attempt in attempts) or any(
+            tool.status == "uncertain" for tool in tools
+        )
         if run.cancel_requested:
             if uncertain:
                 run.status, run.blocked_reason = (
@@ -529,12 +542,30 @@ class ProjectService:
                 return RunView.model_validate(existing)
             tasks, agents = self._tasks(session, run_id), self._agents(session, run_id)
             attempts = self._attempts(session, run_id)
+            tools = self._tools(session, run_id)
+            tool_resume = (
+                command.command == "resume"
+                and run.status == "blocked"
+                and run.pause_requested
+                and bool(tools)
+                and not any(tool.status in {"created", "running", "uncertain"} for tool in tools)
+            )
             try:
-                next_status = transition_run(
-                    run.status,
-                    command.command,
-                    has_running_tasks=any(t.status == "running" for t in tasks),
-                )
+                if (
+                    command.command == "pause"
+                    and run.status == "blocked"
+                    and any(tool.status in {"created", "running"} for tool in tools)
+                ):
+                    next_status = "pausing"
+                elif tool_resume:
+                    next_status = "blocked"
+                else:
+                    next_status = transition_run(
+                        run.status,
+                        command.command,
+                        has_running_tasks=any(t.status == "running" for t in tasks)
+                        or any(tool.status == "running" for tool in tools),
+                    )
             except ValueError as exc:
                 raise DomainError(
                     "conflict", "Команда недоступна в текущем состоянии запуска."
@@ -543,7 +574,13 @@ class ProjectService:
                 run.pause_requested = True
             elif command.command == "resume":
                 run.pause_requested = False
-                next_status = "running" if run.started_at is not None else "created"
+                next_status = (
+                    "blocked"
+                    if tool_resume
+                    else "running"
+                    if run.started_at is not None
+                    else "created"
+                )
             elif command.command == "cancel":
                 run.cancel_requested = True
                 if any(attempt.status == "uncertain" for attempt in attempts):
@@ -552,7 +589,7 @@ class ProjectService:
                 elif any(attempt.status == "running" for attempt in attempts):
                     next_status = "pausing"
             run.status = next_status
-            if attempts:
+            if attempts or tools:
                 self._settle_control(session, run)
                 next_status = run.status
             if next_status == "cancelled":
@@ -584,7 +621,7 @@ class ProjectService:
                 .order_by(Event.seq.desc())
                 .limit(1)
             )
-            if attempts or self._decisions(session, run_id):
+            if attempts or tools or self._decisions(session, run_id):
                 action = (
                     "run.cancelling"
                     if command.command == "cancel" and next_status != "cancelled"
@@ -645,6 +682,9 @@ class ProjectService:
                 ],
                 usage=self._usage(session, run),
                 candidate=candidate_view(session, run.id),
+                tool_runs=[
+                    ToolRunView.model_validate(tool) for tool in self._tools(session, run.id)
+                ],
             )
 
     def usage(self, run_id: str) -> UsageSummary:
@@ -730,14 +770,15 @@ class ProjectService:
                 content=artifact.content_text,
             )
 
-    def worker_connected(self, *, required_roles=()):
+    def worker_connected(self, *, required_roles=(), required_tools=()):
         self.refresh_worker_presence()
         with self.database.read() as session:
             workers = list(
                 session.scalars(select(WorkerHeartbeat).where(WorkerHeartbeat.expires_at > now()))
             )
             roles = {role for worker in workers for role in worker.supported_roles}
-            return bool(workers) and set(required_roles) <= roles
+            tools = {tool for worker in workers for tool in worker.supported_tools}
+            return bool(workers) and set(required_roles) <= roles and set(required_tools) <= tools
 
     def refresh_worker_presence(self):
         # Expiry is a bounded system observation; it never executes a provider.
@@ -800,6 +841,12 @@ class ProjectService:
                 )
             if run.cancel_requested and command.choice in {"retry_with_risk", "retry_files"}:
                 raise DomainError("conflict", "Повтор недоступен после запроса отмены.")
+            if decision.kind == "tool_uncertain_outcome" or decision.tool_run_id is not None:
+                response = self._resolve_tool_decision(
+                    session, run, decision, command, correlation_id
+                )
+                self._save_receipt(session, scope, key, digest, response)
+                return response
             task = session.get(Task, decision.task_id)
             if command.choice == "retry_files":
                 attempt = session.get(AgentRun, decision.attempt_id)

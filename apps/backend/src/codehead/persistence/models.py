@@ -228,8 +228,9 @@ class Decision(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), index=True)
-    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), index=True)
+    task_id: Mapped[str | None] = mapped_column(ForeignKey("tasks.id"), index=True)
     attempt_id: Mapped[str | None] = mapped_column(ForeignKey("agent_runs.id"))
+    tool_run_id: Mapped[str | None] = mapped_column(ForeignKey("tool_runs.id"), index=True)
     kind: Mapped[str] = mapped_column(String(40))
     status: Mapped[str] = mapped_column(String(24))
     version: Mapped[int] = mapped_column(Integer)
@@ -251,6 +252,72 @@ class WorkerHeartbeat(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     supported_roles: Mapped[list] = mapped_column(JSONB)
+    supported_tools: Mapped[list] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+
+
+class ToolRun(Base):
+    __tablename__ = "tool_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('created','running','succeeded','failed',"
+            "'timed_out','cancelled','uncertain')",
+            name="ck_tool_status",
+        ),
+        CheckConstraint(
+            "operation_id IN ('validate_backend','test_backend','build_frontend')",
+            name="ck_tool_operation",
+        ),
+        CheckConstraint(
+            "required_isolation = 'process_only' AND isolation_level = 'process_only'",
+            name="ck_tool_isolation",
+        ),
+        CheckConstraint(
+            "snapshot_version >= 1 AND fencing_token >= 0 "
+            "AND timeout_seconds BETWEEN 1 AND 180 AND output_limit_bytes BETWEEN 1024 AND 262144",
+            name="ck_tool_limits",
+        ),
+        Index("ix_tool_queue", "status", "created_at"),
+        Index(
+            "uq_tool_pending",
+            "workspace_id",
+            "operation_id",
+            unique=True,
+            postgresql_where=text("status IN ('created','running','uncertain')"),
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), index=True)
+    operation_id: Mapped[str] = mapped_column(String(40))
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("candidates.id"))
+    snapshot_version: Mapped[int] = mapped_column(Integer)
+    required_isolation: Mapped[str] = mapped_column(String(20))
+    isolation_level: Mapped[str] = mapped_column(String(20), default="process_only")
+    status: Mapped[str] = mapped_column(String(24))
+    tree_hash: Mapped[str] = mapped_column(String(64))
+    manifest_artifact_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"))
+    manifest_hash: Mapped[str] = mapped_column(String(64))
+    profile_version: Mapped[str] = mapped_column(String(40))
+    profile_hash: Mapped[str] = mapped_column(String(64))
+    acceptance_suite_hash: Mapped[str] = mapped_column(String(64))
+    template_hash: Mapped[str] = mapped_column(String(64))
+    timeout_seconds: Mapped[int] = mapped_column(Integer)
+    output_limit_bytes: Mapped[int] = mapped_column(Integer)
+    commands: Mapped[list] = mapped_column(JSONB, default=list)
+    stdout: Mapped[str] = mapped_column(Text, default="")
+    stderr: Mapped[str] = mapped_column(Text, default="")
+    report: Mapped[dict | None] = mapped_column(JSONB)
+    exit_code: Mapped[int | None] = mapped_column(Integer)
+    error_code: Mapped[str | None] = mapped_column(String(100))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    process_id: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fencing_token: Mapped[int] = mapped_column(BigInteger, default=0)
+    lease_owner: Mapped[str | None] = mapped_column(String(100))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Event(Base):

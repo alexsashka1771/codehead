@@ -27,7 +27,7 @@ export function makeWorkerSnapshot(): Snapshot {
     decision_id: 'decision-architecture', trace_available: true,
   };
   const decision: DecisionView = {
-    id: 'decision-architecture', run_id: base.run.id, task_id: testTask.id, attempt_id: attempt.id,
+    id: 'decision-architecture', run_id: base.run.id, task_id: testTask.id, attempt_id: attempt.id, tool_run_id: null,
     kind: 'architecture_approval', status: 'open', blocking: true, version: 2, title: 'Принять архитектуру',
     summary: 'CTO проверил архитектуру и контракт API. Требуется решение автора.',
     choices: ['approve', 'reject'], artifact_ids: [artifact.id], choice: null, comment: null,
