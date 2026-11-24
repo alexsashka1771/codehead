@@ -2,9 +2,11 @@
 
 import json
 import time
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from hashlib import sha256
 
+from codehead.clinic.files import ROLE_PATHS
+from codehead.llm.file_fixtures import clean_file_bases, propose_files
 from codehead.llm.provider import ArtifactDraft, ProviderFailure, ProviderRequest, ProviderResult
 from codehead.llm.redaction import redact
 
@@ -183,9 +185,13 @@ class TestProvider:
     name = "test"
     model = "clinic-fixture-v1"
 
-    def __init__(self, secrets: tuple[str, ...] = (), delay_seconds: float = 0):
+    def __init__(
+        self, secrets: tuple[str, ...] = (), delay_seconds: float = 0, *, with_files=False
+    ):
         self.secrets = secrets
         self.delay_seconds = delay_seconds
+        self.with_files = with_files
+        self.model = "clinic-fixture-v2" if with_files else "clinic-fixture-v1"
 
     def _failure(self, code: str, message: str, **diagnostics) -> ProviderFailure:
         return ProviderFailure(code, redact(message, self.secrets), **diagnostics)
@@ -193,7 +199,10 @@ class TestProvider:
     def _clean_request(self, request: ProviderRequest) -> ProviderRequest:
         if not isinstance(request, ProviderRequest):
             raise self._failure("invalid_provider_request", "Expected a ProviderRequest.")
-        if not isinstance(request.role, str) or request.role not in _REQUIRED_INPUTS:
+        if not isinstance(request.role, str) or (
+            request.role not in _REQUIRED_INPUTS
+            and not (self.with_files and request.role in ROLE_PATHS)
+        ):
             raise self._failure(
                 "unsupported_role", "The test provider does not support the requested role."
             )
@@ -226,30 +235,46 @@ class TestProvider:
                 {key: redact(item[key], self.secrets) for key in _TEXT_INPUT_FIELDS}
                 | {"version": item["version"]}
             )
-        missing = _REQUIRED_INPUTS[request.role] - {item["artifact_type"] for item in inputs}
+        required = _REQUIRED_INPUTS.get(
+            request.role, {"requirements", "architecture", "api_contract", "decision"}
+        )
+        missing = required - {item["artifact_type"] for item in inputs}
         if missing:
             raise self._failure(
                 "missing_input_artifacts",
                 f"Missing pinned input artifacts: {', '.join(sorted(missing))}.",
             )
-        return ProviderRequest(
+        clean = ProviderRequest(
             role=request.role,
             project_name=redact(request.project_name, self.secrets),
             description=redact(request.description, self.secrets),
             requirements_version=request.requirements_version,
             inputs=tuple(inputs),
             max_output_tokens=request.max_output_tokens,
+            candidate_files=request.candidate_files,
+            profile_version=request.profile_version,
+            profile_hash=request.profile_hash,
+            acceptance_suite_hash=request.acceptance_suite_hash,
         )
+        if clean.role in ROLE_PATHS:
+            clean = replace(clean, candidate_files=clean_file_bases(clean))
+        return clean
 
     def _prompt(self, request: ProviderRequest) -> str:
+        instruction = (
+            "Propose deterministic clinic_demo/v1 test files from permitted pinned bases. "
+            if request.role in ROLE_PATHS
+            else "Produce only deterministic, non-executable clinic_demo/v1 test documents. "
+        )
         payload = {
             "provider": self.name,
             "model": self.model,
             "mode": "test",
-            "instructions_version": "clinic-document-v1",
+            "instructions_version": "clinic-files-v1"
+            if request.role in ROLE_PATHS
+            else "clinic-document-v1",
             "instruction": (
-                "Produce only deterministic, non-executable clinic_demo/v1 test documents. "
-                "No LLM, tool execution, or private chain of thought is requested. "
+                instruction + "No LLM, tool execution, or private chain of thought is requested. "
                 "Use the current project and exact selected input versions."
             ),
         } | asdict(request)
@@ -264,7 +289,12 @@ class TestProvider:
         started = time.perf_counter()
         clean = self._clean_request(request)
         prompt = self._prompt(clean)
-        artifacts, summary = _DOCUMENT_FACTORIES[clean.role](clean)
+        files = ()
+        if clean.role in ROLE_PATHS:
+            files, summary = propose_files(clean, self.secrets)
+            artifacts = ()
+        else:
+            artifacts, summary = _DOCUMENT_FACTORIES[clean.role](clean)
         artifacts = tuple(
             ArtifactDraft(item.artifact_type, redact(item.content, self.secrets), item.media_type)
             for item in artifacts
@@ -278,7 +308,13 @@ class TestProvider:
             )
         raw_response = redact(
             json.dumps(
-                {"artifacts": [asdict(item) for item in artifacts], "summary": summary},
+                {
+                    "artifacts": [asdict(item) for item in artifacts],
+                    "summary": summary,
+                    **(
+                        {"files": [item.model_dump(mode="json") for item in files]} if files else {}
+                    ),
+                },
                 ensure_ascii=False,
                 sort_keys=True,
             ),
@@ -304,4 +340,5 @@ class TestProvider:
             output_tokens=0,
             cost_usd=0.0,
             latency_ms=(time.perf_counter() - started) * 1000,
+            files=files,
         )

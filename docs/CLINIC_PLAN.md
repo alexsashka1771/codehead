@@ -51,11 +51,12 @@ def test_candidate_batch_is_atomic(database):
 
 Файлы: profiles/clinic_demo/v1/fixtures/backend/clinic_api.py, clinic_storage.py, clinic_models.py; fixtures/frontend/App.tsx, api.ts, styles.css; llm/provider.py, test_provider.py; tests/test_candidate_provider.py, tools/test-clinic.mjs.
 
-- [ ] RED: provider возвращает отдельные завершённые файлы только своей области, с base_hash актуальной основы и test-происхождением; live/QA не возвращают fixture.
-- [ ] Backend fixture реализует фиксированный профиль с SQLite transaction/partial UNIQUE и доверенными часами; отдельные реальные HTTP-проверки.
-- [ ] Frontend fixture реализует журнал/справочники/формы/перенос/отмену и состояния; frontend-design, без изменения основной сцены.
-- [ ] В raw response/trace присутствует исходный структурированный результат после redaction; suite/fixtures/template разделены.
-- [ ] GREEN: `npm run test:backend -- apps/backend/tests/test_candidate_provider.py`; `node tools/test-clinic.mjs` даёт фактические HTTP и frontend type/build проверки на отдельном workspace.
+- [x] RED: provider возвращает отдельные завершённые файлы только своей области, с base_hash актуальной основы и test-происхождением; live/QA не возвращают fixture.
+- [x] Backend fixture реализует фиксированный профиль с SQLite transaction/partial UNIQUE и доверенными часами; отдельные реальные HTTP-проверки.
+- [x] Frontend fixture реализует журнал/справочники/формы/перенос/отмену и состояния; frontend-design, без изменения основной сцены.
+- [x] В raw response/trace присутствует исходный структурированный результат после redaction; suite/fixtures/template разделены.
+- [x] GREEN provider/fixtures: 141 provider/legacy, 76 backend, 55 настоящих HTTP; frontend type/build и 17 браузерных сценариев прошли. Независимые spec/quality reviews одобрены.
+- [ ] `node tools/test-clinic.mjs` проверяет именно материализованный worker-кандидат; общий harness завершается после интеграции worker.
 
 ## 4. Worker и конфликт основы
 

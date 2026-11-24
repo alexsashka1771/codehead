@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from codehead.contracts import FileProposal
 from codehead.llm.redaction import redact
 
 
@@ -13,6 +14,10 @@ class ProviderRequest:
     requirements_version: int
     inputs: tuple[dict, ...]
     max_output_tokens: int = 2048
+    candidate_files: tuple[dict, ...] = ()
+    profile_version: str | None = None
+    profile_hash: str | None = None
+    acceptance_suite_hash: str | None = None
 
 
 @dataclass(frozen=True)
@@ -33,6 +38,7 @@ class ProviderResult:
     output_tokens: int | None
     cost_usd: float | None
     latency_ms: float
+    files: tuple[FileProposal, ...] = ()
 
 
 class ProviderFailure(Exception):
