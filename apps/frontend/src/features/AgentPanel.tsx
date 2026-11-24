@@ -69,6 +69,7 @@ export function AgentPanel({ definition, snapshot, active, connected, pending, o
       <details><summary>Входы задачи</summary><InputVersions versions={task.input_versions} artifacts={snapshot?.artifacts} onSelectArtifact={setSelectedArtifactId} />
         <p className="field-hint">Версия записи {task.record_version} · fencing token {task.fencing_token ?? 0}</p></details>
       {decisions.map(decision => <DecisionCard key={decision.id + ':' + decision.version} decision={decision}
+        sourceEnabled={snapshot?.run.workflow_version === 'clinic-v2'}
         artifacts={snapshot?.artifacts ?? []} pending={pending} connected={connected} onResolve={onResolve} onSelectArtifact={setSelectedArtifactId} />)}
       {attempts.length ? <><h3 className="workflow-subheading">Попытки</h3><AttemptList attempts={attempts} artifacts={snapshot?.artifacts ?? []}
         onSelectArtifact={setSelectedArtifactId} active={active} /></> : <p className="field-hint">Попыток выполнения пока нет.</p>}

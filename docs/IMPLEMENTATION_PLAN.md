@@ -1,8 +1,8 @@
 # План реализации: кандидат Clinic Demo
 
-24 ноября 2026 начата сессия 3: [CLINIC_DESIGN](CLINIC_DESIGN.md), [CLINIC_PLAN](CLINIC_PLAN.md). Закреплены профиль/schema и внешний HTTP-suite; реализованы предложения файлов, immutable manifest и отдельная материализация. Четыре целевых файла проверок дали 84 passed, spec review хранения одобрен. Прикладные fixtures и подключение инженеров к worker ещё в работе; пять ролей и готовый Clinic Demo пока не объявляются доступными.
+24 ноября 2026 продолжена сессия 3: [CLINIC_DESIGN](CLINIC_DESIGN.md), [CLINIC_PLAN](CLINIC_PLAN.md). Новый clinic-v2 проходит PM → Architect → CTO, решение автора и независимые Backend/Frontend; immutable manifest материализуется вне HTTP/транзакции. В интерфейсе доступны версия, исходники, хэши и происхождение. Старый clinic-v1 сохраняет границу трёх ролей. Фактические проверки и ограничения — [CLINIC_REPORT](CLINIC_REPORT.md).
 
-По новой просьбе автора начато ведение Git: проверенная основа импортируется в main, незавершённые fixtures и их проверки сохраняются отдельно в feat/clinic-candidate. Порядок — [GIT_WORKFLOW](GIT_WORKFLOW.md). Пользовательская БД и .data не входят в Git.
+Разработка и контрольная точка кандидата ведутся в feat/clinic-candidate. Порядок — [GIT_WORKFLOW](GIT_WORKFLOW.md); пользовательская БД и .data не входят в Git. Прикладные файлы этого этапа — test_injected fixtures, а не результат реальной LLM. Следующая сессия — QA/DevOps, независимые red/green и repair, публичный Runner и preview. До неё run явно блокируется после сохранения кандидата; платные вызовы и локальная модель не подключаются.
 
 ## История: worker и первые роли
 

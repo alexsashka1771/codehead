@@ -9,6 +9,25 @@ beforeEach(() => vi.resetModules());
 afterEach(() => vi.unstubAllGlobals());
 
 describe('command authentication transport', () => {
+  it('provides abortable read-only candidate and artifact-list endpoints scoped to the selected run', async () => {
+    const paths: string[] = [];
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (path: string, options: RequestInit) => {
+      paths.push(path); signals.push(options.signal as AbortSignal);
+      expect(options.method).toBeUndefined();
+      return json(path.endsWith('/candidate') ? null : []);
+    }));
+    const { api } = await import('./api');
+    expect(api).toHaveProperty('candidate');
+    expect(api).toHaveProperty('artifacts');
+    const controller = new AbortController();
+    await api.candidate('run/one', controller.signal);
+    await api.artifacts('run/one', controller.signal);
+    controller.abort();
+    expect(signals.every(signal => signal.aborted)).toBe(true);
+    expect(paths).toEqual(['/api/runs/run%2Fone/candidate', '/api/runs/run%2Fone/artifacts']);
+  });
+
   it('starts test execution only through an explicit mode and keeps live as the default', async () => {
     const modes: unknown[] = [];
     vi.stubGlobal('fetch', vi.fn(async (path: string, options: RequestInit) => {

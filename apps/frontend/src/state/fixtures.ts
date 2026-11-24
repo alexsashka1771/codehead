@@ -6,7 +6,7 @@ export const testRun: RunView = {
   created_at: '2026-11-14T10:00:00Z', started_at: null, finished_at: null, blocked_reason: null,
   cancel_requested: false,
   pause_requested: false,
-  profile_version: null, profile_hash: null, acceptance_suite_hash: null,
+  profile_version: null, profile_hash: null, acceptance_suite_hash: null, template_hash: null,
 };
 
 export function makeSnapshot(): Snapshot {

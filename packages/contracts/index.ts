@@ -37,6 +37,7 @@ export type PauseRequested = boolean;
 export type ProfileVersion = string | null;
 export type ProfileHash = string | null;
 export type AcceptanceSuiteHash = string | null;
+export type TemplateHash = string | null;
 export type Id2 = string;
 export type RunId = string;
 export type Role = 'product_manager' | 'architect' | 'cto' | 'backend' | 'frontend' | 'qa' | 'devops';
@@ -118,7 +119,7 @@ export type Id6 = string;
 export type RunId4 = string;
 export type TaskId2 = string;
 export type AttemptId = string | null;
-export type Kind = 'architecture_approval' | 'uncertain_outcome';
+export type Kind = 'architecture_approval' | 'uncertain_outcome' | 'file_conflict';
 export type Status1 = 'open' | 'resolved';
 export type Version1 = number;
 export type Title = string;
@@ -147,7 +148,7 @@ export type Status2 = 'assembling' | 'materializing' | 'ready' | 'conflict' | 'b
 export type ProfileVersion1 = string;
 export type ProfileHash1 = string;
 export type AcceptanceSuiteHash1 = string;
-export type TemplateHash = string;
+export type TemplateHash1 = string;
 export type TreeHash = string;
 export type ManifestArtifactId = string;
 export type RelativePath1 = string;
@@ -288,7 +289,7 @@ export type ParamsHash = string;
 export type Response = ProjectView | RunView;
 export type CreatedAt7 = string;
 export type Version3 = number;
-export type Choice1 = 'approve' | 'reject' | 'confirm_failed' | 'retry_with_risk';
+export type Choice1 = 'approve' | 'reject' | 'confirm_failed' | 'retry_with_risk' | 'retry_files';
 export type Comment1 = string;
 export type ArtifactId1 = string;
 export type ContentHash2 = string;
@@ -383,6 +384,7 @@ export interface RunView {
   profile_version?: ProfileVersion;
   profile_hash?: ProfileHash;
   acceptance_suite_hash?: AcceptanceSuiteHash;
+  template_hash?: TemplateHash;
 }
 export interface TaskView {
   id: Id2;
@@ -510,7 +512,7 @@ export interface CandidateView {
   profile_version: ProfileVersion1;
   profile_hash: ProfileHash1;
   acceptance_suite_hash: AcceptanceSuiteHash1;
-  template_hash: TemplateHash;
+  template_hash: TemplateHash1;
   tree_hash: TreeHash;
   manifest_artifact_id: ManifestArtifactId;
   files: Files;

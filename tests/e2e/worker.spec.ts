@@ -69,7 +69,7 @@ async function openDecision(page: Page, decision: DecisionView) {
   return card;
 }
 
-test('persists first-role documents and decision; approval does not call CTO again', async ({ page, request }, testInfo) => {
+test('persists first-role documents and decision; candidate approval does not call CTO again', async ({ page, request }, testInfo) => {
   const { project, headers } = await createProject(request);
   const run = await startTest(page, project.id);
   const before = await waitForDecision(request, run.id);
@@ -119,15 +119,19 @@ test('persists first-role documents and decision; approval does not call CTO aga
   await card.getByRole('button', { name: 'Принять архитектуру', exact: true }).click();
   await expect.poll(async () => (await snapshot(request, run.id)).tasks.find(task => task.role === 'cto')?.status,
     { timeout: 15_000 }).toBe('succeeded');
+  await expect.poll(async () => (await snapshot(request, run.id)).candidate?.status,
+    { timeout: 30_000 }).toBe('ready');
+  await expect.poll(async () => (await snapshot(request, run.id)).run.status, { timeout: 15_000 }).toBe('blocked');
   const after = await snapshot(request, run.id);
   expect(after.run.status).toBe('blocked');
-  expect(after.run.blocked_reason).toMatch(/Clinic Demo|Backend|Frontend|следующ|реализ/iu);
+  expect(after.run.blocked_reason).toMatch(/QA.*Runner.*preview/iu);
   expect(after.decisions![0]).toMatchObject({ status: 'resolved', choice: 'approve', version: decision.version + 1 });
-  expect(after.agent_runs?.map(attempt => attempt.id).sort()).toEqual(before.agent_runs?.map(attempt => attempt.id).sort());
-  expect(after.usage?.request_count).toBe(3);
+  expect(after.agent_runs).toHaveLength(5);
+  for (const attempt of before.agent_runs!) expect(after.agent_runs!.find(item => item.id === attempt.id)).toEqual(attempt);
+  expect(after.usage?.request_count).toBe(5);
   const attemptsResponse = await request.get(`/api/runs/${run.id}/agent-runs`);
   expect(attemptsResponse.ok()).toBe(true);
-  expect(await attemptsResponse.json() as AgentRunView[]).toHaveLength(3);
+  expect(await attemptsResponse.json() as AgentRunView[]).toHaveLength(5);
 
   const events: DomainEvent[] = [];
   let cursor = 0;

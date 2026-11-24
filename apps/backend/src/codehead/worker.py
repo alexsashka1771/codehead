@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from codehead.persistence.database import Database
 from codehead.settings import Settings
-from codehead.workflow.worker import Worker
+from codehead.workflow.worker import WorkerPool
 from codehead.workflow.worker_service import WorkerService
 
 
@@ -22,17 +22,14 @@ def main():
         step_delay=settings.test_step_delay_seconds,
         secrets=(settings.command_token.get_secret_value(),),
     )
-    worker = Worker(service, owner=owner)
     stopped = threading.Event()
     signal.signal(signal.SIGINT, lambda *_: stopped.set())
     signal.signal(signal.SIGTERM, lambda *_: stopped.set())
     try:
-        print("CodeHead worker connected: explicit test provider; live unavailable.", flush=True)
-        while not stopped.is_set():
-            worker.run_once()
-            stopped.wait(settings.worker_poll_seconds)
+        print("CodeHead worker connected: two test-provider slots; live unavailable.", flush=True)
+        with WorkerPool(service, owner=owner) as pool:
+            pool.run(stopped, poll_seconds=settings.worker_poll_seconds)
     finally:
-        service.disconnect(owner)
         database.close()
 
 

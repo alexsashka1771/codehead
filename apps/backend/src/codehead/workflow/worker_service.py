@@ -3,17 +3,29 @@
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
 
 from sqlalchemy import select
 
+from codehead.clinic.files import (
+    ROLE_PATHS,
+    FileConflict,
+    InvalidFile,
+    normalize_relative_path,
+    validate_text,
+)
+from codehead.clinic.profile import REPOSITORY_ROOT, load_profile
+from codehead.clinic.workspace import materialize
 from codehead.errors import DomainError
 from codehead.llm.provider import LiveProviderUnavailable, ProviderFailure, ProviderRequest
 from codehead.llm.redaction import redact
 from codehead.llm.test_provider import TestProvider
+from codehead.persistence.candidates import CandidateStore
 from codehead.persistence.models import (
     Agent,
     AgentRun,
     Artifact,
+    Candidate,
     Decision,
     Project,
     Run,
@@ -21,8 +33,11 @@ from codehead.persistence.models import (
     WorkerHeartbeat,
 )
 from codehead.persistence.service import ProjectService, identifier, now
+from codehead.workflow.publication import NEXT_STAGE_REASON, PublicationTransactions
 
-SUPPORTED_ROLES = ("product_manager", "architect", "cto")
+DOCUMENT_ROLES = ("product_manager", "architect", "cto")
+SOURCE_ROLES = ("backend", "frontend")
+SUPPORTED_ROLES = DOCUMENT_ROLES + SOURCE_ROLES
 ARTIFACT_KINDS = {
     "product_manager": {"requirements"},
     "architect": {"architecture", "api_contract"},
@@ -42,8 +57,18 @@ class Lease:
     provider: object
 
 
-class WorkerService(ProjectService):
-    def __init__(self, database, *, clock=now, lease_seconds=30, secrets=(), step_delay=0):
+class WorkerService(PublicationTransactions, ProjectService):
+    def __init__(
+        self,
+        database,
+        *,
+        clock=now,
+        lease_seconds=30,
+        secrets=(),
+        step_delay=0,
+        workspace_root=None,
+        materializer=materialize,
+    ):
         super().__init__(database)
         if not 1 <= lease_seconds <= 300:
             raise ValueError("Lease duration must be between 1 and 300 seconds")
@@ -51,6 +76,16 @@ class WorkerService(ProjectService):
         self.lease_seconds = lease_seconds
         self.secrets = secrets
         self.step_delay = step_delay
+        self.profile = load_profile()
+        self.candidates = CandidateStore(self.profile, clock=clock)
+        self.workspace_root = Path(
+            workspace_root or REPOSITORY_ROOT / ".data" / "candidates"
+        ).absolute()
+        self.materializer = materializer
+
+    @staticmethod
+    def _supported_roles(run):
+        return SUPPORTED_ROLES if run.workflow_version == "clinic-v2" else DOCUMENT_ROLES
 
     def _register(self, session, owner):
         stamp = self.clock()
@@ -58,6 +93,7 @@ class WorkerService(ProjectService):
         if heartbeat is None:
             heartbeat = WorkerHeartbeat(owner=owner, supported_roles=list(SUPPORTED_ROLES))
             session.add(heartbeat)
+        heartbeat.supported_roles = list(SUPPORTED_ROLES)
         heartbeat.updated_at = stamp
         heartbeat.expires_at = stamp + timedelta(seconds=self.lease_seconds)
 
@@ -75,6 +111,7 @@ class WorkerService(ProjectService):
                 .with_for_update(skip_locked=True)
             )
             for run in runs:
+                supported = self._supported_roles(run)
                 changed = False
                 pending = {
                     task.role: task
@@ -82,18 +119,23 @@ class WorkerService(ProjectService):
                     if task.status in {"blocked", "waiting_for_decision"}
                 }
                 for agent in self._agents(session, run.id):
-                    if agent.role in SUPPORTED_ROLES:
-                        operations = ["read_inputs", "propose_artifacts"]
+                    if agent.role in supported:
+                        source = agent.role in SOURCE_ROLES
+                        version = "worker-test-v2" if source else "worker-test-v1"
+                        operations = [
+                            "read_inputs",
+                            "propose_files" if source else "propose_artifacts",
+                        ]
                         if agent.role == "cto":
                             operations.append("request_decision")
                         if (
-                            agent.instructions_version != "worker-test-v1"
+                            agent.instructions_version != version
                             or agent.allowed_operations != operations
                         ):
-                            agent.instructions_version = "worker-test-v1"
+                            agent.instructions_version = version
                             agent.allowed_operations = operations
                             changed = True
-                    if agent.role in SUPPORTED_ROLES and agent.lifecycle == "offline":
+                    if agent.role in supported and agent.lifecycle == "offline":
                         agent.lifecycle = "idle"
                         task = pending.get(agent.role)
                         agent.activity = "waiting" if task else None
@@ -135,7 +177,7 @@ class WorkerService(ProjectService):
             task.status = "blocked"
             task.blocked_reason = reason
             task.record_version += 1
-            if task.role in SUPPORTED_ROLES and agents[task.role].lifecycle == "busy":
+            if task.role in self._supported_roles(run) and agents[task.role].lifecycle == "busy":
                 agent = agents[task.role]
                 agent.lifecycle = "blocked"
                 agent.activity = "waiting"
@@ -157,6 +199,7 @@ class WorkerService(ProjectService):
                 raise ProviderFailure("invalid_workflow", "Неверные зависимости задачи.")
             ancestors.add(dependency)
             pending.extend(tasks[dependency].dependencies)
+        source = run.workflow_version == "clinic-v2" and task.role in SOURCE_ROLES
         inputs = []
         for artifact in session.scalars(
             select(Artifact)
@@ -164,6 +207,13 @@ class WorkerService(ProjectService):
             .order_by(Artifact.created_at, Artifact.id)
         ):
             if artifact.task_id not in ancestors:
+                continue
+            if source and artifact.artifact_type not in {
+                "requirements",
+                "architecture",
+                "api_contract",
+                "decision",
+            }:
                 continue
             if artifact.content_text is None:
                 raise ProviderFailure(
@@ -179,8 +229,56 @@ class WorkerService(ProjectService):
                     "relative_path": artifact.relative_path,
                 }
             )
+        bases = []
+        if source:
+            candidate = self.candidates.ensure(session, run)
+            current = {file["relative_path"]: file for file in candidate.files}
+            for path in sorted(ROLE_PATHS[task.role]):
+                file = current.get(path)
+                bases.append(
+                    {
+                        "relative_path": path,
+                        "base_hash": file["content_hash"] if file else None,
+                        "artifact_id": file["artifact_id"] if file else None,
+                        "version": file["version"] if file else None,
+                    }
+                )
+                if file is None:
+                    continue
+                artifact = session.get(Artifact, file["artifact_id"])
+                if (
+                    artifact is None
+                    or artifact.run_id != run.id
+                    or artifact.artifact_type != "source_code"
+                    or artifact.relative_path != path
+                    or artifact.version != file["version"]
+                    or artifact.content_text is None
+                    or artifact.content_hash != file["content_hash"]
+                ):
+                    raise ProviderFailure(
+                        "input_unavailable", "Основа прикладного файла недоступна."
+                    )
+                inputs.append(
+                    {
+                        "id": artifact.id,
+                        "version": artifact.version,
+                        "artifact_type": artifact.artifact_type,
+                        "content": artifact.content_text,
+                        "content_hash": artifact.content_hash,
+                        "relative_path": artifact.relative_path,
+                    }
+                )
         return ProviderRequest(
-            task.role, project.name, project.description, run.requirements_version, tuple(inputs)
+            task.role,
+            project.name,
+            project.description,
+            run.requirements_version,
+            tuple(inputs),
+            max_output_tokens=65536 if source else 2048,
+            candidate_files=tuple(bases),
+            profile_version=run.profile_version,
+            profile_hash=run.profile_hash,
+            acceptance_suite_hash=run.acceptance_suite_hash,
         )
 
     def claim(self, owner, provider=None):
@@ -206,18 +304,33 @@ class WorkerService(ProjectService):
             ]
             if not ready:
                 return None
-            if ready[0].role not in SUPPORTED_ROLES:
+            if ready[0].role not in self._supported_roles(run):
+                if run.workflow_version == "clinic-v2":
+                    candidate = session.scalar(select(Candidate).where(Candidate.run_id == run.id))
+                    if candidate is not None and candidate.status == "materializing":
+                        return None
                 self._block(
                     session,
                     run,
                     ready,
-                    "Следующий этап Clinic Demo ещё не подключён: Backend/Frontend.",
+                    NEXT_STAGE_REASON
+                    if run.workflow_version == "clinic-v2"
+                    else "Следующий этап Clinic Demo ещё не подключён: Backend/Frontend.",
                     "stage.unavailable",
                 )
                 return None
             task = ready[0]
             attempts = self._attempts(session, run.id)
             limits = run.limits
+            if task.role in SOURCE_ROLES and limits["max_files_per_proposal"] < 3:
+                self._block(
+                    session,
+                    run,
+                    [task],
+                    "Для завершённого предложения инженера нужен лимит хотя бы 3 файла.",
+                    "budget.exceeded",
+                )
+                return None
             reserved = sum(
                 attempt.started_at is not None or attempt.status == "created"
                 for attempt in attempts
@@ -240,7 +353,11 @@ class WorkerService(ProjectService):
             ):
                 return None
             selected_provider = provider or (
-                TestProvider(secrets=self.secrets, delay_seconds=self.step_delay)
+                TestProvider(
+                    secrets=self.secrets,
+                    delay_seconds=self.step_delay,
+                    with_files=run.workflow_version == "clinic-v2",
+                )
                 if run.mode == "test"
                 else LiveProviderUnavailable()
             )
@@ -249,11 +366,11 @@ class WorkerService(ProjectService):
             try:
                 request = self._request(session, run, task)
                 prompt = redact(selected_provider.prepare(request), self.secrets)
-            except ProviderFailure as failure:
+            except (ProviderFailure, InvalidFile) as failure:
                 reason = (
                     "Live-провайдер не подключён. Для проверки процесса выберите тестовый запуск."
                     if failure.code == "provider_unavailable"
-                    else failure.message
+                    else str(failure)
                 )
                 self._block(session, run, [task], reason, failure.code)
                 return None
@@ -268,7 +385,7 @@ class WorkerService(ProjectService):
             for agent in agents:
                 if (
                     run.mode == "test"
-                    and agent.role in SUPPORTED_ROLES
+                    and agent.role in self._supported_roles(run)
                     and agent.lifecycle == "offline"
                 ):
                     agent.lifecycle = "idle"
@@ -278,14 +395,23 @@ class WorkerService(ProjectService):
                 "product_manager": "planning",
                 "architect": "analyzing",
                 "cto": "reviewing",
+                "backend": "coding",
+                "frontend": "coding",
             }[task.role]
-            agent.location = "product" if task.role == "product_manager" else "architecture"
+            agent.location = (
+                "development"
+                if task.role in SOURCE_ROLES
+                else "product"
+                if task.role == "product_manager"
+                else "architecture"
+            )
             agent.current_task_id = task.id
             predecessor = next(
                 (
                     decision
                     for decision in reversed(self._decisions(session, run.id))
-                    if decision.task_id == task.id and decision.choice == "retry_with_risk"
+                    if decision.task_id == task.id
+                    and decision.choice in {"retry_with_risk", "retry_files"}
                 ),
                 None,
             )
@@ -306,6 +432,16 @@ class WorkerService(ProjectService):
                     "instructions_version": agent.instructions_version,
                     "price_version": "not-billable-test-v1",
                     "dispatched": False,
+                    **(
+                        {
+                            "candidate_files": list(request.candidate_files),
+                            "profile_version": request.profile_version,
+                            "profile_hash": request.profile_hash,
+                            "acceptance_suite_hash": request.acceptance_suite_hash,
+                        }
+                        if task.role in SOURCE_ROLES
+                        else {}
+                    ),
                 },
                 created_at=self.clock(),
                 redacted_prompt=prompt,
@@ -416,6 +552,14 @@ class WorkerService(ProjectService):
             )
 
     def _decision(self, session, run, task, attempt, *, kind, summary, artifact_ids=()):
+        title, choices = {
+            "architecture_approval": ("Принять архитектуру?", ["approve", "reject"]),
+            "file_conflict": ("Обновить основу файлов?", ["retry_files", "reject"]),
+            "uncertain_outcome": (
+                "Исход операции неизвестен",
+                ["confirm_failed", "retry_with_risk"],
+            ),
+        }[kind]
         decision = Decision(
             id=identifier(),
             run_id=run.id,
@@ -424,18 +568,52 @@ class WorkerService(ProjectService):
             kind=kind,
             status="open",
             version=1,
-            title="Принять архитектуру?"
-            if kind == "architecture_approval"
-            else "Исход операции неизвестен",
+            title=title,
             summary=redact(summary, self.secrets),
-            choices=["approve", "reject"]
-            if kind == "architecture_approval"
-            else ["confirm_failed", "retry_with_risk"],
+            choices=choices,
             artifact_ids=list(artifact_ids),
             created_at=self.clock(),
         )
         session.add(decision)
         return decision
+
+    def _save_result(self, attempt, result):
+        attempt.finished_at = self.clock()
+        attempt.provider_request_id = result.request_id
+        attempt.stop_reason = result.stop_reason
+        attempt.input_tokens, attempt.output_tokens = result.input_tokens, result.output_tokens
+        attempt.cost_usd, attempt.latency_ms = Decimal(str(result.cost_usd)), result.latency_ms
+        attempt.redacted_response = redact(result.raw_response, self.secrets)
+
+    def _file_conflict(self, session, run, task, attempt, failure, owner):
+        candidate = self.candidates.ensure(session, run)
+        attempt.status = "failed"
+        attempt.error_code, attempt.error_message = failure.code, str(failure)
+        self._release(task)
+        task.status, task.blocked_reason = "waiting_for_decision", str(failure)
+        run.status, run.blocked_reason = "blocked", str(failure)
+        candidate.status, candidate.blocked_reason = "conflict", str(failure)
+        candidate.updated_at = self.clock()
+        agent = session.get(Agent, attempt.agent_id)
+        agent.lifecycle, agent.activity, agent.current_task_id = "blocked", "waiting", task.id
+        references = [candidate.manifest_artifact_id] + [
+            file["artifact_id"]
+            for file in candidate.files
+            if file["relative_path"] in ROLE_PATHS[task.role]
+        ]
+        self._decision(
+            session,
+            run,
+            task,
+            attempt,
+            kind="file_conflict",
+            summary=str(failure),
+            artifact_ids=references,
+        )
+        self._settle_control(session, run)
+        self._emit_workflow(
+            session, run, "task.waiting_for_decision", actor_id=owner, task_id=task.id
+        )
 
     def finish(self, lease, result):
         import hashlib
@@ -449,13 +627,35 @@ class WorkerService(ProjectService):
                 raw_response=result.raw_response,
                 stop_reason=result.stop_reason,
             )
+        source = lease.request.role in SOURCE_ROLES
         kinds = [draft.artifact_type for draft in result.artifacts]
-        if set(kinds) != ARTIFACT_KINDS[lease.request.role] or len(kinds) != len(set(kinds)):
+        if source:
+            try:
+                paths = [
+                    normalize_relative_path(file.relative_path).casefold() for file in result.files
+                ]
+                valid = (
+                    not result.artifacts
+                    and len(paths) == 3
+                    and set(paths) == {path.casefold() for path in ROLE_PATHS[lease.request.role]}
+                )
+                for file in result.files:
+                    validate_text(file.content)
+            except InvalidFile:
+                valid = False
+        else:
+            valid = (
+                set(kinds) == ARTIFACT_KINDS[lease.request.role]
+                and len(kinds) == len(set(kinds))
+                and not result.files
+            )
+        if not valid:
             raise ProviderFailure(
                 "invalid_provider_output",
-                "Провайдер вернул недопустимые документы.",
+                "Провайдер вернул неполный или недопустимый набор файлов/документов.",
                 dispatched=True,
                 raw_response=result.raw_response,
+                stop_reason=result.stop_reason,
             )
         if (
             any(
@@ -466,7 +666,10 @@ class WorkerService(ProjectService):
             or len(result.raw_response.encode("utf-8")) > 262144
         ):
             raise ProviderFailure(
-                "invalid_provider_output", "Ответ превышает лимит содержимого.", dispatched=True
+                "invalid_provider_output",
+                "Ответ превышает лимит содержимого.",
+                dispatched=True,
+                stop_reason=result.stop_reason,
             )
         if (
             not math.isfinite(result.latency_ms)
@@ -479,16 +682,36 @@ class WorkerService(ProjectService):
                 "invalid_provider_output",
                 "Тестовый источник вернул неверный usage.",
                 dispatched=True,
+                stop_reason=result.stop_reason,
             )
         with self.database.sessions.begin() as session:
             run, task, attempt = self._check(session, lease, statuses=("running",))
+            self._save_result(attempt, result)
+            if source and not run.cancel_requested:
+                try:
+                    self.candidates.apply(
+                        session,
+                        run,
+                        task,
+                        attempt,
+                        tuple(
+                            file.model_copy(update={"content": redact(file.content, self.secrets)})
+                            for file in result.files
+                        ),
+                        input_versions=lease.input_versions,
+                    )
+                except FileConflict as failure:
+                    self._file_conflict(session, run, task, attempt, failure, lease.owner)
+                    return
+                except InvalidFile as failure:
+                    raise ProviderFailure(
+                        failure.code,
+                        str(failure),
+                        dispatched=True,
+                        raw_response=result.raw_response,
+                        stop_reason=result.stop_reason,
+                    ) from failure
             attempt.status = "succeeded"
-            attempt.finished_at = self.clock()
-            attempt.provider_request_id = result.request_id
-            attempt.stop_reason = result.stop_reason
-            attempt.input_tokens, attempt.output_tokens = result.input_tokens, result.output_tokens
-            attempt.cost_usd, attempt.latency_ms = Decimal(str(result.cost_usd)), result.latency_ms
-            attempt.redacted_response = redact(result.raw_response, self.secrets)
             agent = next(
                 item for item in self._agents(session, run.id) if item.id == attempt.agent_id
             )
@@ -557,6 +780,8 @@ class WorkerService(ProjectService):
                     artifact_ids=artifact_ids,
                 )
                 action = "task.waiting_for_decision"
+            elif source:
+                self._candidate_progress(session, run)
             self._settle_control(session, run)
             self._emit_workflow(session, run, action, actor_id=lease.owner, task_id=task.id)
 
@@ -602,6 +827,8 @@ class WorkerService(ProjectService):
                     kind="uncertain_outcome",
                     summary=attempt.error_message,
                 )
+            if task.role in SOURCE_ROLES:
+                self._candidate_progress(session, run)
             self._settle_control(session, run)
             self._emit_workflow(
                 session,
@@ -626,6 +853,7 @@ class WorkerService(ProjectService):
                 )
             )
             for run in runs:
+                recovered += self._recover_publication(session, run)
                 connected = (
                     session.scalar(
                         select(WorkerHeartbeat.owner)
@@ -682,6 +910,8 @@ class WorkerService(ProjectService):
                             kind="uncertain_outcome",
                             summary=attempt.error_message,
                         )
+                        if task.role in SOURCE_ROLES:
+                            self._candidate_progress(session, run)
                     recovered += 1
                     self._settle_control(session, run)
                     self._emit_workflow(

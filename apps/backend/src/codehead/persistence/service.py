@@ -9,6 +9,7 @@ from uuid import uuid4
 from pydantic import TypeAdapter
 from sqlalchemy import select, text
 
+from codehead.clinic.profile import load_profile
 from codehead.contracts import (
     AgentRunView,
     AgentView,
@@ -47,6 +48,7 @@ from codehead.persistence.models import (
     Agent,
     AgentRun,
     Artifact,
+    Candidate,
     CommandReceipt,
     Decision,
     Event,
@@ -95,6 +97,7 @@ def payload_hash(payload) -> str:
 class ProjectService:
     def __init__(self, database: Database):
         self.database = database
+        self.clock = now
 
     @staticmethod
     def _lock_commands(session):
@@ -280,6 +283,30 @@ class ProjectService:
 
     def _settle_control(self, session, run):
         attempts = self._attempts(session, run.id)
+        if run.pause_requested or run.cancel_requested:
+            candidate = session.scalar(select(Candidate).where(Candidate.run_id == run.id))
+            if candidate is not None:
+                if candidate.publication_owner is not None:
+                    candidate.publication_owner, candidate.publication_expires_at = None, None
+                    candidate.publication_fence += 1
+                if run.cancel_requested and candidate.status != "ready":
+                    candidate.status = "blocked"
+                    candidate.blocked_reason = (
+                        "Создание кандидата остановлено после запроса отмены."
+                    )
+                    candidate.updated_at = self.clock()
+            for attempt in attempts:
+                if attempt.status != "created":
+                    continue
+                attempt.status, attempt.finished_at = "cancelled", now()
+                task = session.get(Task, attempt.task_id)
+                if task.active_attempt_id == attempt.id:
+                    task.active_attempt_id = None
+                    task.lease_owner, task.lease_expires_at = None, None
+                    task.fencing_token += 1
+                    task.record_version += 1
+                    agent = session.get(Agent, attempt.agent_id)
+                    agent.lifecycle, agent.activity, agent.current_task_id = "idle", None, None
         running = any(attempt.status == "running" for attempt in attempts)
         uncertain = any(attempt.status == "uncertain" for attempt in attempts)
         if run.cancel_requested:
@@ -329,6 +356,32 @@ class ProjectService:
             if uncertain:
                 run.blocked_reason = "Пауза запрошена, но исход предыдущей операции ещё неизвестен."
 
+    def _candidate_progress(self, session, run):
+        candidate = session.scalar(select(Candidate).where(Candidate.run_id == run.id))
+        if candidate is None or candidate.status == "ready":
+            return
+        tasks = [
+            task for task in self._tasks(session, run.id) if task.role in {"backend", "frontend"}
+        ]
+        conflicts = [
+            item
+            for item in self._decisions(session, run.id)
+            if item.kind == "file_conflict" and item.status == "open" and item.blocking
+        ]
+        blocked = [task for task in tasks if task.status in {"blocked", "failed"}]
+        if conflicts:
+            candidate.status, candidate.blocked_reason = "conflict", conflicts[0].summary
+        elif blocked:
+            candidate.status, candidate.blocked_reason = "blocked", blocked[0].blocked_reason
+        else:
+            candidate.status = (
+                "materializing"
+                if all(task.status == "succeeded" for task in tasks)
+                else "assembling"
+            )
+            candidate.blocked_reason = None
+        candidate.updated_at = self.clock()
+
     def create_project(self, command: CreateProject, key: str) -> ProjectView:
         digest = payload_hash(command)
         with self.database.sessions.begin() as session:
@@ -377,12 +430,17 @@ class ProjectService:
                 raise DomainError(
                     "conflict", "Уже есть незавершённый запуск. Завершите или отмените его."
                 )
+            profile = load_profile()
             run = Run(
                 id=identifier(),
                 project_id=project_id,
                 mode=command.mode,
                 workflow_version=WORKFLOW_VERSION,
                 requirements_version=project.requirements_version,
+                profile_version=profile.id,
+                profile_hash=profile.profile_hash,
+                acceptance_suite_hash=profile.suite_hash,
+                template_hash=profile.template_hash,
                 status="created",
                 limits=command.limits.model_dump(mode="json"),
                 last_event_seq=0,
@@ -630,6 +688,23 @@ class ProjectService:
                 raise DomainError("not_found", "Артефакт не найден.", status=404)
             return ArtifactView.model_validate(artifact)
 
+    def artifacts(self, run_id):
+        with self.database.read() as session:
+            self._run(session, run_id)
+            return [
+                ArtifactView.model_validate(artifact)
+                for artifact in session.scalars(
+                    select(Artifact)
+                    .where(Artifact.run_id == run_id)
+                    .order_by(Artifact.created_at, Artifact.id)
+                )
+            ]
+
+    def candidate(self, run_id):
+        with self.database.read() as session:
+            self._run(session, run_id)
+            return candidate_view(session, run_id)
+
     def artifact_content(self, artifact_id):
         with self.database.read() as session:
             artifact = session.get(Artifact, artifact_id)
@@ -655,15 +730,14 @@ class ProjectService:
                 content=artifact.content_text,
             )
 
-    def worker_connected(self):
+    def worker_connected(self, *, required_roles=()):
         self.refresh_worker_presence()
         with self.database.read() as session:
-            return (
-                session.scalar(
-                    select(WorkerHeartbeat.owner).where(WorkerHeartbeat.expires_at > now()).limit(1)
-                )
-                is not None
+            workers = list(
+                session.scalars(select(WorkerHeartbeat).where(WorkerHeartbeat.expires_at > now()))
             )
+            roles = {role for worker in workers for role in worker.supported_roles}
+            return bool(workers) and set(required_roles) <= roles
 
     def refresh_worker_presence(self):
         # Expiry is a bounded system observation; it never executes a provider.
@@ -724,9 +798,28 @@ class ProjectService:
                     "Добавьте подтверждение исхода или согласие с риском дубликата.",
                     status=422,
                 )
-            if run.cancel_requested and command.choice == "retry_with_risk":
+            if run.cancel_requested and command.choice in {"retry_with_risk", "retry_files"}:
                 raise DomainError("conflict", "Повтор недоступен после запроса отмены.")
             task = session.get(Task, decision.task_id)
+            if command.choice == "retry_files":
+                attempt = session.get(AgentRun, decision.attempt_id)
+                if (
+                    decision.kind != "file_conflict"
+                    or run.workflow_version != "clinic-v2"
+                    or task.role not in {"backend", "frontend"}
+                    or task.status != "waiting_for_decision"
+                    or attempt is None
+                    or attempt.status != "failed"
+                    or attempt.error_code != "file_version_conflict"
+                ):
+                    raise DomainError("conflict", "Повтор предложения файлов больше не актуален.")
+            if (
+                command.choice in {"approve", "retry_with_risk", "retry_files", "reject"}
+                and task.status in TERMINAL_RUNS
+            ):
+                raise DomainError(
+                    "conflict", "Завершённая задача не может быть переоткрыта решением."
+                )
             decision.status, decision.choice, decision.comment = (
                 "resolved",
                 command.choice,
@@ -736,7 +829,7 @@ class ProjectService:
             decision.resolved_at = now()
             if decision.blocking:
                 task.record_version += 1
-            if command.choice in {"approve", "retry_with_risk"}:
+            if command.choice in {"approve", "retry_with_risk", "retry_files"}:
                 task.status, task.blocked_reason = "queued", None
                 if command.choice == "retry_with_risk":
                     session.add(
@@ -770,7 +863,16 @@ class ProjectService:
                         "Подтверждён отказ операции. Можно отменить запуск и начать заново."
                     )
             else:
-                task.status, task.blocked_reason = "blocked", "Автор отклонил архитектуру."
+                task.status, task.blocked_reason = (
+                    "blocked",
+                    (
+                        "Автор отклонил повтор предложения файлов."
+                        if decision.kind == "file_conflict"
+                        else "Автор отклонил архитектуру."
+                    ),
+                )
+            if decision.kind == "file_conflict":
+                self._candidate_progress(session, run)
             open_decisions = any(
                 item.status == "open" and item.blocking for item in self._decisions(session, run.id)
             )

@@ -18,6 +18,7 @@
     "check": "node tools/check.mjs",
     "build": "npm run build --workspace @codehead/frontend",
     "test:backend": "node tools/test-backend.mjs",
+    "test:clinic": "node tools/test-clinic.mjs",
     "test:e2e": "node tools/test-e2e.mjs"
   },
   "devDependencies": {

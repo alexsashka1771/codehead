@@ -3,8 +3,10 @@ import { Boxes, ChevronDown, ChevronUp, FileBox, GitBranch, History, List, ListC
 import type { CapabilitiesResponse, DomainEvent, Snapshot } from '../../../../packages/contracts';
 import { formatTime, roleDetails, taskLabels } from './roles';
 import { ArtifactBrowser, AttemptList, DecisionCard, type ResolveDecision } from './WorkerDetails';
+import { CandidatePanel } from './CandidatePanel';
+export { CandidatePanel } from './CandidatePanel';
 
-type Tab = 'tasks' | 'events' | 'artifacts' | 'attempts' | 'decisions' | 'capabilities';
+type Tab = 'tasks' | 'events' | 'candidate' | 'artifacts' | 'attempts' | 'decisions' | 'capabilities';
 interface Props {
   snapshot: Snapshot | null; events: DomainEvent[]; capabilities: CapabilitiesResponse | null; loading: boolean;
   expanded: boolean; onExpandedChange: (expanded: boolean) => void;
@@ -22,14 +24,19 @@ export function Inspector({ snapshot, events, capabilities, loading, expanded, o
   const [tab, setTab] = useState<Tab>('tasks');
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
   const tasks = snapshot?.tasks ?? [];
-  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+  const [artifactSelection, setArtifactSelection] = useState<{ runId: string; id: string } | null>(null);
+  const [attemptSelection, setAttemptSelection] = useState<{ runId: string; id: string } | null>(null);
+  const selectedArtifactId = artifactSelection?.runId === snapshot?.run.id ? artifactSelection?.id ?? null : null;
+  const selectedAttemptId = attemptSelection?.runId === snapshot?.run.id ? attemptSelection?.id ?? null : null;
   const artifacts = snapshot?.artifacts ?? [];
   const attempts = snapshot?.agent_runs ?? [];
   const decisions = snapshot?.decisions ?? [];
-  function selectArtifact(id: string) { setSelectedArtifactId(id); setTab('artifacts'); setExpanded(true); }
+  function selectArtifact(id: string) { if (!snapshot) return; setArtifactSelection({ runId: snapshot.run.id, id }); setTab('artifacts'); setExpanded(true); }
+  function selectAttempt(id: string) { if (!snapshot) return; setAttemptSelection({ runId: snapshot.run.id, id }); setTab('attempts'); setExpanded(true); }
   const tabs = [
     { id: 'tasks' as const, label: 'Очередь задач', short: 'Очередь', count: tasks.length, icon: List },
     { id: 'events' as const, label: 'Журнал событий', short: 'События', count: events.length, icon: ScrollText },
+    { id: 'candidate' as const, label: 'Кандидат Clinic Demo', short: 'Версия', count: snapshot?.candidate?.revision, icon: GitBranch },
     { id: 'artifacts' as const, label: 'Артефакты', short: 'Файлы', count: snapshot?.artifacts.length ?? 0, icon: FileBox },
     { id: 'attempts' as const, label: 'Попытки ролей', short: 'Попытки', count: attempts.length, icon: History },
     { id: 'decisions' as const, label: 'Решения автора', short: 'Решения', count: decisions.filter(decision => decision.status === 'open').length, icon: ListChecks },
@@ -44,9 +51,10 @@ export function Inspector({ snapshot, events, capabilities, loading, expanded, o
       {tab === 'tasks' ? tasks.length ? <table className="task-table"><thead><tr><th>Задача</th><th>Роль</th><th>Зависимости</th><th>Состояние</th></tr></thead><tbody>{tasks.map((task, index) => <tr key={task.id}><td><span className="task-number">{String(index + 1).padStart(2, '0')}</span>{roleDetails[task.role].task}</td><td>{roleDetails[task.role].name}</td><td><span className="dependencies">{task.dependencies.length ? <><GitBranch size={12} />{task.dependencies.map((id) => { const dependency = tasks.find((item) => item.id === id); return dependency ? roleDetails[dependency.role].short : id.slice(0, 8); }).join(' + ')}</> : 'Начало процесса'}</span></td><td><span className={`task-status status-${task.status}`}><span aria-hidden="true" />{taskLabels[task.status]}</span></td></tr>)}</tbody></table> : <EmptyState icon={<List size={26} />} title={loading ? 'Загружаем очередь…' : 'Очередь ещё не создана'} text="Создайте проект и нажмите «Запустить». Здесь появятся реальные задачи и их зависимости." /> : null}
       {tab === 'events' ? events.length ? <ol className="event-list">{events.map((event) => <li key={event.event_id}><span className="event-seq">#{String(event.seq).padStart(3, '0')}</span><time dateTime={event.occurred_at}>{formatTime(event.occurred_at)}</time><span className="event-message">{eventNames[event.event_type ?? ''] ?? event.event_type}{event.event_type === 'task.queued' ? <span className="event-role">{roleDetails[event.payload.task.role].name}</span> : event.event_type === 'workflow.updated' ? <span className="event-role">{event.payload.action}</span> : null}</span><code>{event.event_type}</code></li>)}</ol> : <EmptyState icon={<ScrollText size={26} />} title={loading ? 'Загружаем историю…' : 'В журнале пока пусто'} text="Здесь появятся события, сохранённые сервером. История останется после обновления страницы." /> : null}
       {tab === 'artifacts' ? artifacts.length ? <ArtifactBrowser artifacts={artifacts} selectedId={expanded ? selectedArtifactId : null} onSelect={selectArtifact} /> : <EmptyState icon={<FileBox size={26} />} title="Результатов пока нет" text="После тестового выполнения первых ролей здесь появятся неизменяемые документы с указанным источником." /> : null}
-      {tab === 'attempts' ? attempts.length ? <div className="worker-data"><AttemptList attempts={attempts} artifacts={artifacts} tasks={tasks} onSelectArtifact={selectArtifact} active={expanded} /></div> : <EmptyState icon={<History size={26} />} title="Попыток пока нет" text="Worker сохраняет каждую попытку, её входы и результат. Live-провайдер пока недоступен." /> : null}
+      {tab === 'candidate' ? <CandidatePanel snapshot={snapshot} onSelectArtifact={selectArtifact} onSelectAttempt={selectAttempt} /> : null}
+      {tab === 'attempts' ? attempts.length ? <div className="worker-data"><AttemptList key={snapshot?.run.id + ':' + selectedAttemptId} attempts={selectedAttemptId ? attempts.filter(attempt => attempt.id === selectedAttemptId) : attempts} artifacts={artifacts} tasks={tasks} onSelectArtifact={selectArtifact} active={expanded} />{selectedAttemptId ? <button type="button" className="button text" onClick={() => setAttemptSelection(null)}>Все попытки</button> : null}</div> : <EmptyState icon={<History size={26} />} title="Попыток пока нет" text="Worker сохраняет каждую попытку, её входы и результат. Live-провайдер пока недоступен." /> : null}
       {tab === 'decisions' ? decisions.length ? <div className="worker-data">{decisions.map(decision => <DecisionCard key={decision.id + ':' + decision.version}
-        decision={decision} artifacts={artifacts} pending={pending} connected={connected} onResolve={onResolve} onSelectArtifact={selectArtifact} />)}</div>
+        decision={decision} sourceEnabled={snapshot?.run.workflow_version === 'clinic-v2'} artifacts={artifacts} pending={pending} connected={connected} onResolve={onResolve} onSelectArtifact={selectArtifact} />)}</div>
         : <EmptyState icon={<ListChecks size={26} />} title="Решений пока нет" text="После оценки CTO здесь можно прочитать документы и принять или отклонить архитектуру." /> : null}
       {tab === 'capabilities' ? <div className="capability-list">{capabilities?.capabilities.length ? capabilities.capabilities.map((capability) => <div className="capability-row" key={capability.id}><strong>{capabilityNames[capability.id] ?? capability.id}</strong><span className={`capability-status ${capability.status}`}>{capabilityStatus[capability.status]}</span><p>{capability.reason ?? 'Подключено к текущему серверу.'}</p></div>) : <EmptyState icon={<Boxes size={26} />} title="Нет данных о возможностях" text="Восстановите соединение с сервером, чтобы получить актуальный список." />}</div> : null}
     </div>

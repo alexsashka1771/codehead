@@ -1,8 +1,12 @@
 """Materialize committed source snapshots without executing or overwriting code."""
 
+import errno
 import json
+import msvcrt
 import os
 import stat
+import time
+from contextlib import contextmanager
 from pathlib import Path
 from uuid import UUID
 
@@ -74,6 +78,34 @@ def _scan_existing(root, expected):
                 raise InvalidFile("Workspace содержит неучтённые файлы; версия не перезаписана.")
 
 
+@contextmanager
+def _publication_lock(root, version):
+    identity, revision = version.split("/")
+    relative = f"{identity}/.publication-{revision}.lock"
+    path = workspace_path(root, relative)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    workspace_path(root, relative)
+    with path.open("a+b") as stream:
+        deadline = time.monotonic() + 30
+        while True:
+            stream.seek(0)
+            try:
+                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+                break
+            except OSError as error:
+                if error.errno not in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:
+                    raise
+                if time.monotonic() >= deadline:
+                    raise InvalidFile("Другая публикация этой версии ещё не завершена.") from error
+                time.sleep(0.05)
+        try:
+            workspace_path(root, relative)
+            yield
+        finally:
+            stream.seek(0)
+            msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+
+
 def materialize(
     root: Path, candidate: CandidateView, contents: dict[str, str], manifest_content: str
 ):
@@ -113,6 +145,11 @@ def materialize(
     version = f"{identity}/v{candidate.revision}"
     root = Path(root).absolute()
     destination = workspace_path(root, f"{version}/.codehead/manifest.json").parents[1]
+    with _publication_lock(root, version):
+        return _materialize_locked(destination, expected)
+
+
+def _materialize_locked(destination, expected):
     _scan_existing(destination, {path.casefold() for path in expected})
     targets = {path: workspace_path(destination, path) for path in expected}
     for path, target in targets.items():

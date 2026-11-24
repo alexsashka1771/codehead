@@ -1,6 +1,10 @@
 import hashlib
 import importlib
 import json
+import subprocess
+import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -90,6 +94,66 @@ def test_materialization_is_idempotent_without_rewriting_existing_sources(tmp_pa
     before = (path / "backend/clinic_api.py").stat().st_mtime_ns
     assert module.materialize(tmp_path, candidate, contents, manifest) == path
     assert (path / "backend/clinic_api.py").stat().st_mtime_ns == before
+
+
+def test_concurrent_replay_waits_for_complete_immutable_file(tmp_path, monkeypatch):
+    candidate, contents, manifest = descriptor()
+    module = workspace_module()
+    opened, release = threading.Event(), threading.Event()
+    original = Path.open
+
+    def delayed_open(path, mode="r", *args, **kwargs):
+        stream = original(path, mode, *args, **kwargs)
+        if path.name == "clinic_api.py" and mode == "xb":
+            opened.set()
+            assert release.wait(timeout=5)
+        return stream
+
+    monkeypatch.setattr(Path, "open", delayed_open)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(module.materialize, tmp_path, candidate, contents, manifest)
+        assert opened.wait(timeout=5)
+        second = pool.submit(module.materialize, tmp_path, candidate, contents, manifest)
+        try:
+            with pytest.raises(TimeoutError):
+                second.result(timeout=0.2)
+        finally:
+            release.set()
+        assert first.result(timeout=5) == second.result(timeout=5)
+
+
+def test_publication_lock_spans_processes_and_is_released_after_owner_exit(tmp_path):
+    candidate, contents, manifest = descriptor()
+    command = (
+        "import sys; from pathlib import Path; "
+        "from codehead.clinic.workspace import _publication_lock; "
+        "lock = _publication_lock(Path(sys.argv[1]), sys.argv[2]); "
+        "lock.__enter__(); print('locked', flush=True); sys.stdin.readline()"
+    )
+    owner = subprocess.Popen(
+        [sys.executable, "-c", command, str(tmp_path), f"{candidate.id}/v3"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            assert pool.submit(owner.stdout.readline).result(timeout=5) == "locked\n"
+            pending = pool.submit(
+                workspace_module().materialize, tmp_path, candidate, contents, manifest
+            )
+            try:
+                with pytest.raises(TimeoutError):
+                    pending.result(timeout=0.2)
+            finally:
+                owner.communicate(input="exit\n", timeout=5)
+            assert owner.returncode == 0
+            assert pending.result(timeout=5) == tmp_path / candidate.id / "v3"
+    finally:
+        if owner.poll() is None:
+            owner.kill()
+            owner.communicate(timeout=5)
 
 
 def test_hash_mismatch_is_detected_before_any_directory_is_created(tmp_path):

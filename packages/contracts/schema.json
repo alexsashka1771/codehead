@@ -1035,7 +1035,8 @@
             "approve",
             "reject",
             "confirm_failed",
-            "retry_with_risk"
+            "retry_with_risk",
+            "retry_files"
           ],
           "title": "Choice",
           "type": "string"
@@ -1083,7 +1084,8 @@
         "kind": {
           "enum": [
             "architecture_approval",
-            "uncertain_outcome"
+            "uncertain_outcome",
+            "file_conflict"
           ],
           "title": "Kind",
           "type": "string"
@@ -2179,6 +2181,18 @@
           ],
           "default": null,
           "title": "Acceptance Suite Hash"
+        },
+        "template_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template Hash"
         }
       },
       "required": [

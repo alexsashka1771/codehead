@@ -42,6 +42,7 @@ def test_rejected_template_does_not_leave_pending_artifacts(database):
         persisted = session.get(Run, run.id)
         persisted.profile_version, persisted.profile_hash = profile.id, profile.profile_hash
         persisted.acceptance_suite_hash = profile.suite_hash
+        persisted.template_hash = profile.template_hash
         with pytest.raises(InvalidFile):
             store.ensure(session, persisted)
         session.flush()
@@ -84,6 +85,7 @@ def prepared(database):
         persisted.profile_version = profile.id
         persisted.profile_hash = profile.profile_hash
         persisted.acceptance_suite_hash = profile.suite_hash
+        persisted.template_hash = profile.template_hash
         store.ensure(session, persisted)
     return database, service, store, run
 

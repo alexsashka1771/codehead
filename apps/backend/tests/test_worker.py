@@ -16,7 +16,7 @@ from codehead.contracts import (
 )
 from codehead.errors import DomainError
 from codehead.llm.test_provider import TestProvider
-from codehead.persistence.models import Task
+from codehead.persistence.models import Run, Task
 from codehead.persistence.service import ProjectService
 
 
@@ -62,6 +62,14 @@ def started(database):
         "create-worker",
     )
     run = service.start_run(project.id, StartRun(mode="test"), "start-worker", "worker-test")
+    # Exercise saved clinic-v1 runs; new clinic-v2 behavior has its own worker suite.
+    with database.sessions.begin() as session:
+        persisted = session.get(Run, run.id)
+        persisted.workflow_version = "clinic-v1"
+        persisted.profile_version = None
+        persisted.profile_hash = None
+        persisted.acceptance_suite_hash = None
+    run = service.snapshot(run.id).run
     return service, run
 
 

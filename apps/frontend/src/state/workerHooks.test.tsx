@@ -7,6 +7,7 @@ import { useImmutableResource } from './useImmutableResource';
 import { useRunConnection } from './useRunConnection';
 import { makeEvent, makeSnapshot } from './fixtures';
 import { makeWorkerSnapshot, makeWorkflowEvent } from './workerFixtures';
+import { makeCandidateEvent, makeCandidateSnapshot } from './candidateFixtures';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -76,6 +77,61 @@ describe('immutable selection reads', () => {
 });
 
 describe('worker stream usage', () => {
+  it('restores a candidate on reload and applies its materialization event without changing immutable references', async () => {
+    const snapshot = makeCandidateSnapshot('materializing');
+    vi.spyOn(api, 'snapshot').mockResolvedValue(snapshot);
+    vi.spyOn(api, 'events').mockResolvedValue({ events: [], has_more: false, next_after_seq: 3, last_event_seq: 3 });
+    vi.spyOn(api, 'usage').mockResolvedValue(snapshot.usage!);
+    const hook = await mountHook(() => useRunConnection(snapshot.run.id));
+    try {
+      expect(hook.value.snapshot?.candidate).toEqual(snapshot.candidate);
+      await act(async () => { Socket.latest.onmessage?.({ data: JSON.stringify(makeCandidateEvent(4)) }); });
+      expect(hook.value.snapshot?.candidate?.status).toBe('ready');
+      expect(hook.value.snapshot?.candidate?.files).toEqual(snapshot.candidate?.files);
+      expect(hook.value.snapshot?.last_event_seq).toBe(4);
+      await act(async () => { hook.value.reconnect(); });
+      expect(hook.value.snapshot?.candidate?.manifest_hash).toBe(snapshot.candidate?.manifest_hash);
+    } finally { await hook.unmount(); }
+  });
+
+  it('aborts an earlier run snapshot and ignores its late candidate after selecting another run', async () => {
+    const first = makeCandidateSnapshot();
+    const second = structuredClone(first);
+    second.run.id = 'run-two'; second.candidate!.run_id = 'run-two'; second.candidate!.id = 'candidate-two';
+    for (const collection of [second.tasks, second.agents, second.artifacts, second.agent_runs!, second.decisions!]) {
+      for (const view of collection) view.run_id = 'run-two';
+    }
+    const delayed = deferred<typeof first>();
+    const signals: AbortSignal[] = [];
+    vi.spyOn(api, 'snapshot').mockImplementation((id, signal) => {
+      signals.push(signal!); return id === first.run.id ? delayed.promise : Promise.resolve(second);
+    });
+    vi.spyOn(api, 'events').mockResolvedValue({ events: [], has_more: false, next_after_seq: 3, last_event_seq: 3 });
+    vi.spyOn(api, 'usage').mockResolvedValue(second.usage!);
+    let selected = first.run.id;
+    const hook = await mountHook(() => useRunConnection(selected));
+    try {
+      selected = second.run.id; await hook.rerender();
+      expect(signals[0].aborted).toBe(true);
+      expect(hook.value.snapshot?.candidate?.id).toBe('candidate-two');
+      await act(async () => { delayed.resolve(first); });
+      expect(hook.value.snapshot?.run.id).toBe('run-two');
+      expect(hook.value.snapshot?.candidate?.id).toBe('candidate-two');
+    } finally { await hook.unmount(); }
+  });
+
+  it('rejects a foreign candidate response without exposing its files and requests resynchronization', async () => {
+    const snapshot = makeCandidateSnapshot(); snapshot.candidate!.run_id = 'foreign-run';
+    vi.spyOn(api, 'snapshot').mockResolvedValue(snapshot);
+    const events = vi.spyOn(api, 'events');
+    const hook = await mountHook(() => useRunConnection(snapshot.run.id));
+    try {
+      expect(hook.value.snapshot).toBeNull();
+      expect(hook.value.connection).toBe('reconnecting');
+      expect(events).not.toHaveBeenCalled();
+    } finally { await hook.unmount(); }
+  });
+
   it('opens the websocket before a delayed usage read and never overwrites newer projected usage', async () => {
     const snapshot = makeWorkerSnapshot();
     const first: DomainEvent = { ...makeEvent(), event_type: 'run.created',

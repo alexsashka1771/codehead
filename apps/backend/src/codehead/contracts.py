@@ -112,6 +112,7 @@ class RunView(Contract):
     profile_version: str | None = None
     profile_hash: str | None = None
     acceptance_suite_hash: str | None = None
+    template_hash: str | None = None
 
 
 class TaskView(Contract):
@@ -251,7 +252,7 @@ class DecisionView(Contract):
     run_id: str
     task_id: str
     attempt_id: str | None
-    kind: Literal["architecture_approval", "uncertain_outcome"]
+    kind: Literal["architecture_approval", "uncertain_outcome", "file_conflict"]
     status: Literal["open", "resolved"]
     version: int = Field(ge=1)
     title: str
@@ -267,7 +268,7 @@ class DecisionView(Contract):
 
 class DecisionResolution(Contract):
     version: int = Field(ge=1)
-    choice: Literal["approve", "reject", "confirm_failed", "retry_with_risk"]
+    choice: Literal["approve", "reject", "confirm_failed", "retry_with_risk", "retry_files"]
     comment: str = Field(default="", max_length=8000)
 
 

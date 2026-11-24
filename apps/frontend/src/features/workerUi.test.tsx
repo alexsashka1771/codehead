@@ -4,8 +4,40 @@ import type { DecisionView } from '../../../../packages/contracts';
 import { RunPanel } from './RunPanel';
 import { ArtifactBrowser, AttemptList, DecisionCard, ArtifactText, TraceText } from './WorkerDetails';
 import { makeWorkerSnapshot } from '../state/workerFixtures';
+import { makeCandidateSnapshot } from '../state/candidateFixtures';
 
 describe('worker controls and audit content', () => {
+  it('explains the five-role candidate workflow for v2 while retaining the three-role legacy boundary', () => {
+    const render = (snapshot: ReturnType<typeof makeCandidateSnapshot>) => renderToStaticMarkup(<RunPanel run={snapshot.run}
+      runs={[snapshot.run]} snapshot={snapshot} loading={false} pending={null} hasProject connected usage={snapshot.usage!} testAvailable
+      onSelectRun={() => {}} onStart={() => {}} onStartTest={() => {}} onCommand={() => {}} />);
+    const markup = render(makeCandidateSnapshot());
+    expect(markup).toContain('Backend');
+    expect(markup).toContain('Frontend');
+    expect(render(makeWorkerSnapshot())).toContain('PM → Architect → CTO.');
+  });
+
+  it('explains architecture approval using the selected v2 run without claiming the legacy boundary', () => {
+    const snapshot = makeWorkerSnapshot();
+    const markup = renderToStaticMarkup(<DecisionCard decision={snapshot.decisions![0]} artifacts={snapshot.artifacts}
+      pending={false} connected sourceEnabled onResolve={async () => true} onSelectArtifact={() => {}} />);
+    expect(markup).toContain('Backend');
+    expect(markup).toContain('Frontend');
+    expect(markup).not.toContain('Разработка Clinic Demo на следующем этапе пока недоступна.');
+  });
+
+  it('labels source code and manifest by purpose while retaining their exact immutable relative paths', () => {
+    const snapshot = makeCandidateSnapshot();
+    const source = snapshot.artifacts.find(artifact => artifact.id === snapshot.candidate!.files[0].artifact_id)!;
+    const manifest = snapshot.artifacts.find(artifact => artifact.id === snapshot.candidate!.manifest_artifact_id)!;
+    const markup = renderToStaticMarkup(<ArtifactBrowser artifacts={[source, manifest]} selectedId={null} onSelect={() => {}} />);
+    expect(markup).toContain('Исходный код');
+    expect(markup).toContain('Manifest кандидата');
+    expect(markup).toContain(source.relative_path);
+    expect(markup).toContain(manifest.relative_path);
+    expect(markup).toContain('aria-label="Исходный код · ' + source.relative_path + ' · v' + source.version + '"');
+  });
+
   it('offers an explicit test action and labels zero cost as a test source', () => {
     const snapshot = makeWorkerSnapshot();
     const markup = renderToStaticMarkup(<RunPanel run={snapshot.run} runs={[snapshot.run]} snapshot={snapshot}
@@ -75,6 +107,26 @@ describe('worker controls and audit content', () => {
     expect(markup).toContain('Начало вызова');
     expect(markup).toContain('Завершение');
     expect(markup).toContain('2026-11-24T10:00:01.123456Z');
+  });
+
+  it('offers a fresh file proposal for a conflict without claiming architecture approval', () => {
+    const decision: DecisionView = { ...makeWorkerSnapshot().decisions![0], kind: 'file_conflict',
+      choices: ['retry_files', 'reject'], title: 'Основа файлов изменилась', artifact_ids: [] };
+    const markup = renderToStaticMarkup(<DecisionCard decision={decision} artifacts={[]} pending={false}
+      connected onResolve={() => Promise.resolve(true)} onSelectArtifact={() => {}} />);
+    expect(markup).toContain('Предложить файлы заново');
+    expect(markup).toContain('Отклонить набор файлов');
+    expect(markup).toContain('актуальную основу');
+    expect(markup).not.toContain('Принятие завершит оценку CTO');
+  });
+
+  it('reports a rejected file batch as a file decision', () => {
+    const decision: DecisionView = { ...makeWorkerSnapshot().decisions![0], kind: 'file_conflict',
+      status: 'resolved', choice: 'reject', title: 'Основа файлов изменилась', artifact_ids: [] };
+    const markup = renderToStaticMarkup(<DecisionCard decision={decision} artifacts={[]} pending={false}
+      connected onResolve={() => Promise.resolve(true)} onSelectArtifact={() => {}} />);
+    expect(markup).toContain('Набор файлов отклонён');
+    expect(markup).not.toContain('Архитектура отклонена');
   });
 
   it('identifies a document by its purpose while retaining its immutable storage path', () => {

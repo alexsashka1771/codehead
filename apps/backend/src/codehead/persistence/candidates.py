@@ -51,8 +51,11 @@ class CandidateStore:
             run.profile_version != self.profile.id
             or run.profile_hash != self.profile.profile_hash
             or run.acceptance_suite_hash != self.profile.suite_hash
+            or run.template_hash != self.profile.template_hash
         ):
-            raise InvalidFile("Закреплённый профиль или набор проверок изменился после Start.")
+            raise InvalidFile(
+                "Закреплённый профиль, каркас или набор проверок изменился после Start."
+            )
         candidate = session.scalar(select(Candidate).where(Candidate.run_id == run.id))
         if candidate is not None:
             if candidate.template_hash != self.profile.template_hash:

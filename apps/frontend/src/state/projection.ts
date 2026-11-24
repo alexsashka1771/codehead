@@ -66,7 +66,10 @@ function validatePayloadScope(snapshot: Snapshot, event: DomainEvent) {
   if ('artifacts' in payload) check(payload.artifacts);
   if ('agent_runs' in payload) check(payload.agent_runs);
   if ('decisions' in payload) check(payload.decisions);
-  if ('candidate' in payload && payload.candidate) check([payload.candidate]);
+  if ('candidate' in payload && payload.candidate) {
+    check([payload.candidate]);
+    validateCandidate({ ...snapshot, ...payload });
+  }
 }
 
 export function projectHistory(events: DomainEvent[], expectedLastSeq?: number): Snapshot {
@@ -137,6 +140,7 @@ function withCompatibilityDefaults(snapshot: Snapshot): Snapshot {
       profile_version: snapshot.run.profile_version ?? null,
       profile_hash: snapshot.run.profile_hash ?? null,
       acceptance_suite_hash: snapshot.run.acceptance_suite_hash ?? null,
+      template_hash: snapshot.run.template_hash ?? null,
       limits: { ...snapshot.run.limits, max_file_bytes: snapshot.run.limits.max_file_bytes ?? 65536,
         max_files_per_proposal: snapshot.run.limits.max_files_per_proposal ?? 4,
         max_proposal_bytes: snapshot.run.limits.max_proposal_bytes ?? 262144 } },
@@ -187,7 +191,70 @@ export function hydrateSnapshot(snapshot: Snapshot): Snapshot {
     requireId(decision.task_id, taskIds); requireId(decision.attempt_id, attemptIds);
     for (const id of decision.artifact_ids) requireId(id, artifactIds);
   }
+  validateCandidate(normalized);
   return normalized;
+}
+
+function validateCandidate(snapshot: Snapshot) {
+  const candidate = snapshot.candidate;
+  if (!candidate) return;
+  const invalid = () => { throw new ProjectionError('invalid_event'); };
+  const artifact = (id: string) => {
+    const found = snapshot.artifacts.find(item => item.id === id);
+    if (!found || found.run_id !== snapshot.run.id) throw new ProjectionError('foreign_run');
+    return found;
+  };
+  const sameVersions = (left: Record<string, number>, right: Record<string, number>) =>
+    Object.keys(left).length === Object.keys(right).length && Object.entries(left).every(([id, version]) => right[id] === version);
+  const hash = (value: string) => /^[a-f0-9]{64}$/.test(value);
+  if (candidate.run_id !== snapshot.run.id) throw new ProjectionError('foreign_run');
+  if (candidate.profile_version !== snapshot.run.profile_version || candidate.profile_hash !== snapshot.run.profile_hash
+    || candidate.acceptance_suite_hash !== snapshot.run.acceptance_suite_hash
+    || (snapshot.run.template_hash != null && candidate.template_hash !== snapshot.run.template_hash)
+    || ![candidate.profile_hash, candidate.acceptance_suite_hash, candidate.template_hash, candidate.tree_hash].every(hash)) invalid();
+  const manifest = artifact(candidate.manifest_artifact_id);
+  let currentManifest: typeof manifest | null = manifest;
+  while (currentManifest) {
+    for (const [id, version] of Object.entries(currentManifest.input_versions)) {
+      if (artifact(id).version !== version) invalid();
+    }
+    if (currentManifest.provenance?.producer_id) {
+      const producer = snapshot.agent_runs?.find(item => item.id === currentManifest!.provenance!.producer_id);
+      if (!producer || producer.run_id !== snapshot.run.id) throw new ProjectionError('foreign_run');
+      if (producer.task_id !== currentManifest.task_id || snapshot.tasks.find(task => task.id === producer.task_id)?.role !== currentManifest.author_role) invalid();
+    }
+    const parent: typeof manifest | null = currentManifest.provenance?.parent_artifact_id ? artifact(currentManifest.provenance.parent_artifact_id) : null;
+    if (parent && (parent.artifact_type !== 'candidate_manifest' || parent.version >= currentManifest.version)) invalid();
+    currentManifest = parent;
+  }
+  if (manifest.artifact_type !== 'candidate_manifest' || manifest.version !== candidate.revision
+    || !hash(manifest.content_hash) || candidate.manifest_hash !== manifest.content_hash
+    || candidate.manifest_byte_size !== manifest.byte_size || manifest.media_type !== 'application/json') invalid();
+  const paths = new Set<string>();
+  for (const file of candidate.files) {
+    const source = artifact(file.artifact_id);
+    const parent = file.parent_artifact_id ? artifact(file.parent_artifact_id) : null;
+    const producer = file.producer_id ? snapshot.agent_runs?.find(item => item.id === file.producer_id) : null;
+    if (file.producer_id && (!producer || producer.run_id !== snapshot.run.id)) throw new ProjectionError('foreign_run');
+    if (paths.has(file.relative_path) || source.artifact_type !== 'source_code' || source.relative_path !== file.relative_path
+      || source.version !== file.version || source.content_hash !== file.content_hash || !hash(file.content_hash)
+      || source.media_type !== file.media_type || source.byte_size !== file.byte_size
+      || (source.author_role ?? null) !== (file.producer_role ?? null)
+      || source.provenance?.origin !== file.source || (source.provenance?.producer_id ?? null) !== (file.producer_id ?? null)
+      || (source.provenance?.parent_artifact_id ?? null) !== (file.parent_artifact_id ?? null)
+      || !sameVersions(source.input_versions, file.input_versions ?? {})) invalid();
+    if (parent && (parent.artifact_type !== 'source_code' || parent.relative_path !== file.relative_path
+      || parent.content_hash !== file.parent_hash || parent.version >= file.version)) invalid();
+    if (!parent && file.parent_hash != null) invalid();
+    if (producer && (producer.task_id !== source.task_id
+      || snapshot.tasks.find(task => task.id === producer.task_id)?.role !== file.producer_role)) invalid();
+    if ((file.origin === 'template') !== (file.source === 'template')
+      || (file.origin === 'test_injected' && file.source !== 'test') || (file.origin === 'generated' && file.source !== 'live')) invalid();
+    for (const [id, version] of Object.entries(file.input_versions ?? {})) {
+      if (artifact(id).version !== version) invalid();
+    }
+    paths.add(file.relative_path);
+  }
 }
 
 function normalizeTimestamp(value: string): string {

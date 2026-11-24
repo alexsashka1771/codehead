@@ -13,13 +13,16 @@ export const attemptLabels: Record<AgentRunView['status'], string> = {
 const choiceLabels: Record<DecisionResolution['choice'], string> = {
   approve: 'Принять архитектуру', reject: 'Отклонить архитектуру',
   confirm_failed: 'Подтвердить известный отказ', retry_with_risk: 'Повторить с риском',
+  retry_files: 'Предложить файлы заново',
 };
 const resolvedLabels: Record<string, string> = {
   approve: 'Архитектура принята', reject: 'Архитектура отклонена',
   confirm_failed: 'Известный отказ подтверждён', retry_with_risk: 'Повтор с риском согласован',
+  retry_files: 'Повтор файлов согласован',
 };
 const artifactLabels: Record<string, string> = {
   requirements: 'Требования', architecture: 'Архитектура', api_contract: 'Контракт API', decision: 'Оценка CTO',
+  source_code: 'Исходный код', candidate_manifest: 'Manifest кандидата',
 };
 function artifactLabel(artifact: ArtifactView) { return artifactLabels[artifact.artifact_type] ?? artifact.relative_path; }
 
@@ -78,7 +81,7 @@ export function ArtifactBrowser({ artifacts, selectedId, onSelect }: {
   const selected = artifacts.find(artifact => artifact.id === selectedId);
   return <div className="artifact-browser"><ul className="artifact-list">{artifacts.map(artifact =>
     <li key={artifact.id}><button type="button" className="artifact-select" aria-pressed={artifact.id === selectedId} data-artifact-id={artifact.id}
-      aria-label={artifactLabel(artifact) + ' · v' + artifact.version} onClick={() => onSelect(artifact.id)}><FileText size={16} /><span className="artifact-name"><strong>{artifactLabel(artifact)}</strong><small>{artifact.relative_path}</small></span><span>v{artifact.version}</span></button>
+      aria-label={artifactLabel(artifact) + (artifact.artifact_type === 'source_code' ? ' · ' + artifact.relative_path : '') + ' · v' + artifact.version} onClick={() => onSelect(artifact.id)}><FileText size={16} /><span className="artifact-name"><strong>{artifactLabel(artifact)}</strong><small>{artifact.relative_path}</small></span><span>v{artifact.version}</span></button>
       <span className="document-origin">{artifact.provenance?.origin === 'test' ? 'ТЕСТ' : artifact.provenance?.origin ?? 'Источник неизвестен'}</span>
     </li>)}</ul>{selected ? <ArtifactDocument key={selected.id} artifact={selected} artifacts={artifacts} /> : null}</div>;
 }
@@ -122,9 +125,9 @@ export function AttemptList({ attempts, artifacts, tasks = [], onSelectArtifact,
   })}</ol>;
 }
 
-export function DecisionCard({ decision, artifacts, pending, connected, onResolve, onSelectArtifact }: {
+export function DecisionCard({ decision, artifacts, pending, connected, onResolve, onSelectArtifact, sourceEnabled = false }: {
   decision: DecisionView; artifacts: ArtifactView[]; pending: boolean; connected: boolean;
-  onResolve: ResolveDecision; onSelectArtifact: (id: string) => void;
+  onResolve: ResolveDecision; onSelectArtifact: (id: string) => void; sourceEnabled?: boolean;
 }) {
   const [comment, setComment] = useState('');
   const [riskAccepted, setRiskAccepted] = useState(false);
@@ -144,7 +147,10 @@ export function DecisionCard({ decision, artifacts, pending, connected, onResolv
     {open ? <>
       {reconciliation ? <p className="decision-risk">Сверка предыдущей отправки не останавливает новую работу. Пауза и отмена ожидают известного исхода старой попытки. Подтверждайте отказ только при известном результате.</p>
         : uncertain ? <p className="decision-risk">Исход предыдущей отправки неизвестен. Повтор может создать дублирующий вызов и дополнительные расходы. Подтверждайте отказ только при известном результате.</p>
-        : <p className="field-hint">Принятие завершит оценку CTO без нового вызова провайдера. Разработка Clinic Demo на следующем этапе пока недоступна.</p>}
+        : decision.kind === 'file_conflict' ? <p className="field-hint">Набор файлов не применён. Повтор получит актуальную основу и создаст новую попытку инженера.</p>
+        : <p className="field-hint">Принятие завершит оценку CTO без нового вызова провайдера. {sourceEnabled
+          ? 'Backend и Frontend подготовят исходный код кандидата. QA, Runner и preview пока недоступны.'
+          : 'Разработка Clinic Demo на следующем этапе пока недоступна.'}</p>}
       <label className="decision-comment"><span>{uncertain ? 'Объяснение · минимум 10 символов' : 'Комментарий к решению (необязательно)'}</span>
         <textarea value={comment} onChange={event => setComment(event.target.value)} rows={2} maxLength={4000} disabled={pending} />
       </label>
@@ -153,10 +159,10 @@ export function DecisionCard({ decision, artifacts, pending, connected, onResolv
       <div className="decision-actions">{choices.map(choice => <button key={choice} type="button"
         className={'button ' + (choice === 'approve' ? 'primary' : choice === 'reject' ? 'text danger' : 'secondary')}
         disabled={pending || !connected || explanationMissing || (choice === 'retry_with_risk' && !riskAccepted)}
-        onClick={() => void onResolve(decision, choice, comment.trim())}>{choiceLabels[choice]}</button>)}</div>
+        onClick={() => void onResolve(decision, choice, comment.trim())}>{decision.kind === 'file_conflict' && choice === 'reject' ? 'Отклонить набор файлов' : choiceLabels[choice]}</button>)}</div>
       {!connected ? <p className="field-hint">Для ответа восстановите соединение с сервером.</p> : null}
       {pending ? <p role="status" className="field-hint">Сохраняем решение…</p> : null}
-    </> : <><p className="decision-result" role="status">{resolvedLabels[decision.choice ?? ''] ?? decision.choice ?? 'Решение сохранено'}{decision.comment ? ' · ' + decision.comment : ''}</p>
+    </> : <><p className="decision-result" role="status">{decision.kind === 'file_conflict' && decision.choice === 'reject' ? 'Набор файлов отклонён' : resolvedLabels[decision.choice ?? ''] ?? decision.choice ?? 'Решение сохранено'}{decision.comment ? ' · ' + decision.comment : ''}</p>
       {decision.resolved_at ? <p className="field-hint">Сохранено <time dateTime={decision.resolved_at}>{formatTime(decision.resolved_at, true)}</time></p> : null}</>}
   </section>;
 }

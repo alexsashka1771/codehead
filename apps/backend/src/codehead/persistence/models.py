@@ -75,6 +75,7 @@ class Run(Base):
     profile_version: Mapped[str | None] = mapped_column(String(40))
     profile_hash: Mapped[str | None] = mapped_column(String(64))
     acceptance_suite_hash: Mapped[str | None] = mapped_column(String(64))
+    template_hash: Mapped[str | None] = mapped_column(String(64))
 
 
 class Task(Base):

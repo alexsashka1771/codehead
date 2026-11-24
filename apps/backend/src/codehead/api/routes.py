@@ -11,6 +11,7 @@ from codehead.contracts import (
     ArtifactContent,
     ArtifactView,
     AttemptTrace,
+    CandidateView,
     CapabilitiesResponse,
     Capability,
     CreateProject,
@@ -61,12 +62,12 @@ def database_status(request: Request) -> str:
     return "ready"
 
 
-def worker_ready(request: Request) -> bool:
+def worker_ready(request: Request, *, required_roles=()) -> bool:
     service = request.app.state.service
     if service is None:
         return False
     try:
-        return service.worker_connected()
+        return service.worker_connected(required_roles=required_roles)
     except OperationalError:
         return False
 
@@ -91,6 +92,10 @@ def capabilities(request: Request):
     persistence = "available" if ready else "degraded"
     reason = None if ready else "Нет подключения к PostgreSQL."
     connected = ready and worker_ready(request)
+    first_roles = ready and worker_ready(
+        request, required_roles=("product_manager", "architect", "cto")
+    )
+    engineers = ready and worker_ready(request, required_roles=("backend", "frontend"))
     return CapabilitiesResponse(
         stage="worker" if connected else "foundation",
         roles=list(ROLE_DEFINITIONS),
@@ -107,15 +112,33 @@ def capabilities(request: Request):
             ),
             Capability(
                 id="test_execution",
-                status="available" if connected else "disabled",
+                status="available" if first_roles else "disabled",
                 reason="Ответы заглушки, без внешних LLM-вызовов."
-                if connected
-                else "Для тестового процесса нужен worker.",
+                if first_roles
+                else "Для тестового процесса нужен worker с PM, Architect и CTO.",
             ),
             Capability(
                 id="first_roles",
-                status="available" if connected else "disabled",
+                status="available" if first_roles else "disabled",
                 reason="Тестовая цепочка PM → Architect → CTO с решением автора.",
+            ),
+            Capability(
+                id="candidate_files",
+                status="available" if engineers else "disabled",
+                reason="После решения CTO тестовые Backend/Frontend предлагают отдельные файлы "
+                "Clinic Demo. Их версии и происхождение сохраняются в manifest."
+                if engineers
+                else "Worker с тестовыми Backend/Frontend не подключён. Перезапустите npm run dev.",
+            ),
+            Capability(
+                id="qa_execution",
+                status="planned",
+                reason="QA и DevOps ещё не исполняются worker; готовый кандидат ждёт этого этапа.",
+            ),
+            Capability(
+                id="preview",
+                status="planned",
+                reason="Публичный запуск кандидата и preview ещё не подключены.",
             ),
             Capability(
                 id="live_generation",
@@ -221,6 +244,16 @@ def usage(run_id: ResourceId, service: Service):
 @router.get("/api/runs/{run_id}/agent-runs", response_model=list[AgentRunView])
 def agent_runs(run_id: ResourceId, service: Service):
     return service.agent_runs(run_id)
+
+
+@router.get("/api/runs/{run_id}/artifacts", response_model=list[ArtifactView])
+def artifacts(run_id: ResourceId, service: Service):
+    return service.artifacts(run_id)
+
+
+@router.get("/api/runs/{run_id}/candidate", response_model=CandidateView | None)
+def candidate(run_id: ResourceId, service: Service):
+    return service.candidate(run_id)
 
 
 @router.get("/api/agent-runs/{attempt_id}/trace", response_model=AttemptTrace)
