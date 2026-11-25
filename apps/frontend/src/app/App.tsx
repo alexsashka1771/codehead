@@ -30,6 +30,7 @@ export function App() {
   const [focusRequest, setFocusRequest] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<Panel>(null);
+  const [toolRequest, setToolRequest] = useState<{ runId: string; id: string } | null>(null);
   const projectOpen = activePanel === 'project';
   const roleOpen = activePanel === 'role';
   const dataOpen = activePanel === 'data';
@@ -59,6 +60,7 @@ export function App() {
     && accepted.candidateId === stream.snapshot.candidate?.id && accepted.revision === stream.snapshot.candidate.revision
     && !stream.snapshot.tool_runs?.some(tool => tool.id === accepted.toolRunId));
   const testCapability = workspace.capabilities?.capabilities.find(capability => capability.id === 'test_execution');
+  const qaCapability = workspace.capabilities?.capabilities.find(capability => capability.id === 'qa_execution');
 
   useEffect(() => {
     try { localStorage.setItem('codehead.theme.v1', night ? 'night' : 'day'); }
@@ -136,10 +138,10 @@ export function App() {
     await workspace.command(value);
     stream.reconnect();
   }
-  function start(mode: StartRun['mode'] = 'live') {
+  function start(mode: StartRun['mode'] = 'live', scenario?: StartRun['test_scenario']) {
     dataReturnFocus.current = dataToggle.current;
     choosePanel('data');
-    void workspace.start(mode);
+    void workspace.start(mode, scenario);
   }
   async function resolveDecision(decision: DecisionView, choice: DecisionResolution['choice'], comment: string) {
     const saved = await workspace.resolveDecision(decision, choice, comment);
@@ -239,7 +241,9 @@ export function App() {
           {!showForm ? <RunPanel run={workspace.run} runs={workspace.runs} snapshot={stream.snapshot}
             loading={workspace.runsLoading} pending={workspace.pending} hasProject={Boolean(workspace.project)}
             connected={connected} usage={stream.usage} onSelectRun={workspace.selectRun} onStart={() => start('live')}
-            onStartTest={() => start('test')} testAvailable={testCapability?.status === 'available'} testReason={testCapability?.reason}
+            onStartTest={scenario => start('test', scenario)} testScenario={workspace.testScenario} onScenarioChange={workspace.selectTestScenario}
+            testAvailable={testCapability?.status === 'available' && qaCapability?.status === 'available'}
+            testReason={qaCapability?.status !== 'available' ? qaCapability?.reason ?? 'QA worker сейчас недоступен.' : testCapability?.reason}
             onCommand={value => void command(value)} /> : null}
         </div>
       </aside>
@@ -249,14 +253,15 @@ export function App() {
           <button type="button" className="icon-button" aria-label="Скрыть карточку роли" title="Скрыть карточку роли · Escape" onClick={closeRole}><X size={18} /></button>
         </header>
         <div className="panel-body"><AgentPanel key={selectedDefinition.role} definition={selectedDefinition} snapshot={stream.snapshot}
-          active={roleOpen} connected={connected} pending={Boolean(workspace.pending)} onResolve={resolveDecision} /></div>
+          active={roleOpen} connected={connected} pending={Boolean(workspace.pending)} onResolve={resolveDecision}
+          onSelectTool={id => { if (stream.snapshot) { setToolRequest({ runId: stream.snapshot.run.id, id }); choosePanel('data'); } }} /></div>
       </aside>
       <AgentStrip roles={roles} agents={stream.snapshot?.agents ?? EMPTY_AGENTS} selected={selectedRole}
         onSelect={selectRole} hasRun={Boolean(stream.snapshot)} />
       <Inspector snapshot={stream.snapshot} events={stream.events} capabilities={workspace.capabilities}
         loading={Boolean(workspace.selection.runId) && !stream.snapshot && connectionBusy}
         expanded={dataOpen} onExpandedChange={showData} connected={connected} pending={Boolean(workspace.pending)} onResolve={resolveDecision}
-        onQueueTool={queueTool} awaitingToolEvent={awaitingToolEvent} />
+        onQueueTool={queueTool} awaitingToolEvent={awaitingToolEvent} toolRequest={toolRequest} />
     </main>
     <footer className="statusbar">
       <span><Database size={12} />{workspace.error ? 'Сервер недоступен' : workspace.loading ? 'Подключаем хранилище' : 'Данные сохраняются на сервере'}</span>

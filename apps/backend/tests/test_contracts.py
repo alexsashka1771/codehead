@@ -11,6 +11,8 @@ def test_default_file_limits_preserve_legacy_start_receipt_hash():
     from codehead.persistence.service import payload_hash
 
     payload = StartRun(mode="test").model_dump(mode="json")
+    payload.pop("workflow_version")
+    payload.pop("test_scenario")
     for field in ("max_file_bytes", "max_files_per_proposal", "max_proposal_bytes"):
         payload["limits"].pop(field)
     legacy = hashlib.sha256(

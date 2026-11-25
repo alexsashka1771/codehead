@@ -9,6 +9,16 @@ beforeEach(() => vi.resetModules());
 afterEach(() => vi.unstubAllGlobals());
 
 describe('command authentication transport', () => {
+  it('pins new starts to v3 and transports the selected scenario', async () => {
+    const bodies: unknown[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (path: string, options: RequestInit) => {
+      if (path === '/api/session') return json({ command_token: 'memory-token' });
+      bodies.push(JSON.parse(options.body as string)); return json({ id: 'saved-run' });
+    }));
+    const { api } = await import('./api');
+    await api.start('project-one', 'scenario-key', 'test', 'repair_success');
+    expect(bodies[0]).toMatchObject({ workflow_version: 'clinic-v3', mode: 'test', test_scenario: 'repair_success' });
+  });
   it('provides abortable read-only candidate and artifact-list endpoints scoped to the selected run', async () => {
     const paths: string[] = [];
     const signals: AbortSignal[] = [];

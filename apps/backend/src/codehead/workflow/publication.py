@@ -53,7 +53,7 @@ class PublicationTransactions:
             run = session.scalar(
                 select(Run)
                 .where(
-                    Run.workflow_version == "clinic-v2",
+                    Run.workflow_version.in_(["clinic-v2", "clinic-v3"]),
                     Run.status == "running",
                     Run.cancel_requested.is_(False),
                     Run.pause_requested.is_(False),
@@ -169,6 +169,12 @@ class PublicationTransactions:
             candidate.publication_owner, candidate.publication_expires_at = None, None
             candidate.updated_at = self.clock()
             self._emit_workflow(session, run, "candidate.ready", actor_id=lease.owner)
+            if run.workflow_version == "clinic-v3":
+                try:
+                    self._quality_ready(session, run, candidate)
+                except (InvalidFile, ValueError, OSError) as failure:
+                    self._publication_blocked(session, run, candidate, str(failure), lease.owner)
+                return True
             self._block(
                 session,
                 run,

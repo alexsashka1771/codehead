@@ -11,10 +11,11 @@ const operations: { id: ToolCommand['operation_id']; label: string; result: stri
 const statusLabels: Record<ToolRunView['status'], string> = {
   created: 'В очереди', running: 'Выполняется', succeeded: 'Успешно', failed: 'Ошибка', cancelled: 'Отменено', uncertain: 'Исход неизвестен', timed_out: 'Таймаут',
 };
-export function ToolRunsPanel({ snapshot, capabilities, connected, pending, onQueue, onSelectArtifact, onSelectDecision, awaitingToolEvent = false }: {
+export function ToolRunsPanel({ snapshot, capabilities, connected, pending, onQueue, onSelectArtifact, onSelectDecision, awaitingToolEvent = false, selectedId = null, onSelectAll }: {
   snapshot: Snapshot | null; capabilities: CapabilitiesResponse | null; connected: boolean; pending: boolean;
   onQueue: QueueTool; onSelectArtifact: (id: string) => void; onSelectDecision: (id: string) => void;
   awaitingToolEvent?: boolean;
+  selectedId?: string | null; onSelectAll?: () => void;
 }) {
   const candidate = snapshot?.candidate;
   const tools = snapshot?.tool_runs ?? [];
@@ -22,7 +23,7 @@ export function ToolRunsPanel({ snapshot, capabilities, connected, pending, onQu
   const active = tools.some(tool => ['created', 'running', 'uncertain'].includes(tool.status));
   const reason = !snapshot ? 'Выберите запуск, чтобы проверить сохранённого кандидата.'
     : !connected ? 'Для проверки восстановите соединение с сервером.'
-    : snapshot.run.workflow_version !== 'clinic-v2' ? 'Запуск clinic-v1 не создаёт исходный код кандидата для Runner.'
+    : !['clinic-v2', 'clinic-v3'].includes(snapshot.run.workflow_version) ? 'Запуск clinic-v1 не создаёт исходный код кандидата для Runner.'
     : snapshot.run.mode !== 'test' ? 'На этом этапе Runner доступен для просматриваемого тестового кандидата. Live-генерация пока недоступна.'
     : snapshot.run.cancel_requested || snapshot.run.status === 'cancelled' ? 'Запрошена отмена. Новые проверки недоступны.'
     : snapshot.run.pause_requested || ['paused', 'pausing'].includes(snapshot.run.status) ? 'Запрошена пауза. Возобновите запуск перед новой проверкой.'
@@ -34,18 +35,20 @@ export function ToolRunsPanel({ snapshot, capabilities, connected, pending, onQu
   const disabled = pending || reason !== null;
   return <section className="tool-panel" aria-label="Проверки кандидата" data-candidate-revision={candidate?.revision}>
     <div className="decision-heading"><h3>Проверки кандидата{candidate ? ' · версия ' + candidate.revision : ''}</h3></div>
-    <p className="field-hint">Runner выполняет реальные локальные процессы. QA, DevOps и preview пока недоступны.</p>
+    <p className="field-hint">Runner выполняет реальные локальные процессы. {snapshot?.run.workflow_version === 'clinic-v3' ? 'История автоматических циклов и отчёты доступны во вкладке QA. DevOps и preview пока недоступны.' : 'QA, DevOps и preview пока недоступны.'}</p>
     <p className="tool-isolation">Изоляция process_only: Python, pytest и npm исполняют код с доступом к файлам и сети локального пользователя. Используйте проверенный учебный код и синтетические данные.</p>
     <div className="tool-actions">{operations.map(operation => <button type="button" key={operation.id} className="button secondary" disabled={disabled}
       onClick={() => { if (!disabled && candidate) void onQueue({ operation_id: operation.id, workspace_id: candidate.id,
         snapshot_version: candidate.revision, required_isolation: 'process_only', timeout_seconds: 180, output_limit_bytes: 262144 }); }}>{operation.label}</button>)}</div>
     {reason ? <p className="field-hint" role="status">{reason}</p> : null}
     {pending ? <p className="field-hint" role="status">Сохраняем команду проверки…</p> : null}
-    {tools.length ? <ol className="tool-list">{[...tools].sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at) || right.id.localeCompare(left.id)).map(tool => {
+    {selectedId ? <button type="button" className="button text" onClick={onSelectAll}>Все проверки</button> : null}
+    {tools.length ? <ol className="tool-list">{tools.filter(tool => !selectedId || tool.id === selectedId).sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at) || right.id.localeCompare(left.id)).map(tool => {
       const decision = snapshot?.decisions?.find(item => item.tool_run_id === tool.id && item.status === 'open');
       return <li className="tool-entry" key={tool.id} data-tool-id={tool.id} data-tool-status={tool.status}>
         <div className="attempt-heading"><h4>{operations.find(operation => operation.id === tool.operation_id)?.result ?? tool.operation_id} · v{tool.snapshot_version}</h4>
           <span className={'task-status status-' + tool.status}>{statusLabels[tool.status]}</span></div>
+        {tool.qa_cycle_id ? <p className="field-hint">Цикл QA · итерация {snapshot?.quality_cycles?.find(cycle => cycle.id === tool.qa_cycle_id)?.iteration ?? 'неизвестна'}</p> : null}
         {candidate && tool.snapshot_version !== candidate.revision ? <p className="field-hint">Исторический результат версии {tool.snapshot_version}; текущий кандидат — v{candidate.revision}.</p> : null}
         <dl className="candidate-metadata">
           <div><dt>Код завершения</dt><dd>{tool.exit_code ?? 'Неизвестен'}</dd></div>

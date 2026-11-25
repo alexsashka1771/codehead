@@ -39,6 +39,9 @@ async function createCandidateRun(page: Page, request: APIRequestContext, fallba
   await openProjectControls(page);
   const start = page.getByRole('button', { name: 'Запустить тест', exact: true });
   await expect(start).toBeEnabled({ timeout: 15_000 });
+  await page.route(`**/api/projects/${project.id}/runs`, async route => {
+    await route.continue({ postData: JSON.stringify({ ...route.request().postDataJSON(), workflow_version: 'clinic-v2' }) });
+  }, { times: 1 });
   const created = page.waitForResponse(response => response.url().endsWith(`/api/projects/${project.id}/runs`) && response.request().method() === 'POST');
   await start.focus(); await page.keyboard.press('Enter');
   const runResponse = await created;
@@ -227,7 +230,7 @@ test('seeded candidate snapshots equal paginated event prefixes across parallel 
     expect(projectResponse.status()).toBe(201);
     const project: ProjectView = await projectResponse.json();
     const runResponse = await request.post(`/api/projects/${project.id}/runs`, {
-      headers: { ...headers, 'Idempotency-Key': randomUUID() }, data: { mode: 'test', limits: { max_parallel_tasks: parallel } },
+      headers: { ...headers, 'Idempotency-Key': randomUUID() }, data: { mode: 'test', workflow_version: 'clinic-v2', limits: { max_parallel_tasks: parallel } },
     });
     expect(runResponse.status()).toBe(201);
     const run: RunView = await runResponse.json();

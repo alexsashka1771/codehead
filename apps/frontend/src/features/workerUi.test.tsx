@@ -7,6 +7,22 @@ import { makeWorkerSnapshot } from '../state/workerFixtures';
 import { makeCandidateSnapshot } from '../state/candidateFixtures';
 
 describe('worker controls and audit content', () => {
+  it('explains the QA boundary after approving a v3 architecture', () => {
+    const snapshot = makeWorkerSnapshot();
+    const markup = renderToStaticMarkup(<DecisionCard decision={snapshot.decisions![0]} artifacts={snapshot.artifacts}
+      pending={false} connected sourceEnabled qualityEnabled onResolve={async () => true} onSelectArtifact={() => {}} />);
+    expect(markup).toContain('QA'); expect(markup).not.toContain('QA и preview пока недоступны');
+  });
+  it('offers labelled scenarios and explains v3 real QA without enabling Live', () => {
+    const snapshot = makeCandidateSnapshot(); snapshot.run.workflow_version = 'clinic-v3';
+    const markup = renderToStaticMarkup(<RunPanel run={snapshot.run} runs={[snapshot.run]} snapshot={snapshot}
+      loading={false} pending={null} hasProject connected usage={snapshot.usage!} testAvailable
+      onSelectRun={() => {}} onStart={() => {}} onStartTest={() => {}} onCommand={() => {}} />);
+    expect(markup).toContain('Сценарий теста'); expect(markup).toContain('repair_success'); expect(markup).toContain('repair_blocked');
+    expect(markup).toContain('реальные проверки Python'); expect(markup).toContain('до двух исправлений');
+    expect(markup).not.toContain('QA и preview пока недоступны');
+    expect(markup).toMatch(/disabled=""[^>]*>.*?Запустить<\/button>/);
+  });
   it('explains the five-role candidate workflow for v2 while retaining the three-role legacy boundary', () => {
     const render = (snapshot: ReturnType<typeof makeCandidateSnapshot>) => renderToStaticMarkup(<RunPanel run={snapshot.run}
       runs={[snapshot.run]} snapshot={snapshot} loading={false} pending={null} hasProject connected usage={snapshot.usage!} testAvailable

@@ -15,7 +15,7 @@ export function CandidatePanel({ snapshot, onSelectArtifact, onSelectAttempt }: 
     onClick={() => onSelectArtifact(id)}>{label}</button>;
   return <section className="candidate-panel" aria-label="Сохранённый кандидат" data-candidate-id={candidate.id} data-candidate-revision={candidate.revision}>
     <div className="decision-heading"><h3>Clinic Demo · версия {candidate.revision}</h3><span className="quiet-label">{statusLabels[candidate.status]}</span></div>
-    <p className="field-hint">QA и preview пока недоступны. Проверки Runner доступны во вкладке «Проверки» после сохранения версии и подключения worker.</p>
+    <p className="field-hint">{snapshot?.run.workflow_version === 'clinic-v3' ? 'История QA доступна во вкладке «QA». Preview пока недоступен.' : 'QA и preview пока недоступны.'} Проверки Runner доступны во вкладке «Проверки» после сохранения версии и подключения worker.</p>
     {candidate.blocked_reason ? <p className="attempt-error" role="status">{candidate.blocked_reason}</p> : null}
     <dl className="candidate-metadata">
       <div><dt>Профиль</dt><dd>{candidate.profile_version}</dd></div>
@@ -36,7 +36,7 @@ export function CandidatePanel({ snapshot, onSelectArtifact, onSelectAttempt }: 
       <code className="document-hash">SHA-256 {file.content_hash}</code>
       <details><summary>Происхождение файла</summary><dl className="candidate-metadata">
         <div><dt>Производитель</dt><dd>{file.producer_id ? <button type="button" className="document-link" data-attempt-id={file.producer_id}
-          onClick={() => onSelectAttempt(file.producer_id!)}>{file.producer_role ? roleDetails[file.producer_role].name : 'Роль неизвестна'} · {file.producer_id}</button> : 'Технический каркас'}</dd></div>
+          onClick={() => onSelectAttempt(file.producer_id!)}>{file.producer_role ? roleDetails[file.producer_role].name : 'Роль неизвестна'} · {file.producer_id}</button> : file.origin === 'test_injected' && file.source === 'test' ? 'Доверенная тестовая инъекция' : 'Технический каркас'}</dd></div>
         <div><dt>Источник</dt><dd>{file.source}</dd></div>
         <div><dt>Родительская версия</dt><dd>{file.parent_artifact_id ? artifactLink(file.parent_artifact_id, file.parent_artifact_id) : 'Первый файл'}</dd></div>
         {file.parent_hash ? <div><dt>Хэш основы</dt><dd><code>{file.parent_hash}</code></dd></div> : null}

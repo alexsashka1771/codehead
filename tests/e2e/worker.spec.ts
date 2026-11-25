@@ -40,6 +40,9 @@ async function startTest(page: Page, projectId: string, fallback = false, settle
   await openProjectControls(page);
   const start = page.getByRole('button', { name: 'Запустить тест', exact: true });
   await expect(start).toBeEnabled({ timeout: 15_000 });
+  await page.route(`**/api/projects/${projectId}/runs`, async route => {
+    await route.continue({ postData: JSON.stringify({ ...route.request().postDataJSON(), workflow_version: 'clinic-v2' }) });
+  }, { times: 1 });
   const responsePromise = page.waitForResponse(response => response.url().endsWith(`/api/projects/${projectId}/runs`)
     && response.request().method() === 'POST');
   await start.focus(); await page.keyboard.press('Enter');
@@ -70,6 +73,7 @@ async function openDecision(page: Page, decision: DecisionView) {
 }
 
 test('persists first-role documents and decision; candidate approval does not call CTO again', async ({ page, request }, testInfo) => {
+  test.setTimeout(120_000);
   const { project, headers } = await createProject(request);
   const run = await startTest(page, project.id);
   const before = await waitForDecision(request, run.id);

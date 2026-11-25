@@ -97,6 +97,7 @@ test('keeps a user-selected panel when a late project save finishes', async ({ p
 });
 
 test('shows a failed start outside the collapsed project panel', async ({ page, request }) => {
+  test.skip(process.env.CODEHEAD_E2E_WITH_WORKER !== '1', 'Starting a test requires the ready QA worker.');
   const { project, run, headers } = await createRun(request);
   const cancelled = await request.post('/api/runs/' + run.id + '/commands', {
     headers: { ...headers, 'Idempotency-Key': randomUUID() }, data: { command: 'cancel' },
@@ -109,7 +110,7 @@ test('shows a failed start outside the collapsed project panel', async ({ page, 
   });
   await page.goto('/?project=' + project.id + '&run=' + run.id);
   await page.getByRole('button', { name: 'Управление проектом', exact: true }).click();
-  await page.getByRole('button', { name: 'Запустить', exact: true }).click();
+  await page.getByRole('button', { name: 'Запустить тест', exact: true }).click();
   await expect(page.locator('.control-rail')).toBeHidden();
   await expect(page.getByRole('alert')).toContainText('Test start rejected.');
   await page.getByRole('button', { name: 'Выбрать роль: QA Engineer', exact: true }).click();

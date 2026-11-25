@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { FileText, RefreshCw, ScrollText } from 'lucide-react';
-import type { AgentRunView, ArtifactView, AttemptTrace, DecisionResolution, DecisionView, TaskView } from '../../../../packages/contracts';
+import type { AgentRunView, ArtifactView, AttemptTrace, DecisionResolution, DecisionView, Snapshot, TaskView } from '../../../../packages/contracts';
 import { api } from '../app/api';
 import { useImmutableResource } from '../state/useImmutableResource';
 import { formatTime, roleDetails } from './roles';
+import { QualityArtifactDocument } from './QualityPanel';
 
 export type ResolveDecision = (decision: DecisionView, choice: DecisionResolution['choice'], comment: string) => Promise<boolean>;
 export const attemptLabels: Record<AgentRunView['status'], string> = {
@@ -23,6 +24,7 @@ const resolvedLabels: Record<string, string> = {
 const artifactLabels: Record<string, string> = {
   requirements: 'Требования', architecture: 'Архитектура', api_contract: 'Контракт API', decision: 'Оценка CTO',
   source_code: 'Исходный код', candidate_manifest: 'Manifest кандидата',
+  test_report: 'Отчёт QA · TestReport', bug: 'Дефект · Bug', tool_report: 'Результат проверки · ToolReport', test_injection: 'Доверенная тестовая инъекция',
 };
 function artifactLabel(artifact: ArtifactView) { return artifactLabels[artifact.artifact_type] ?? artifact.relative_path; }
 
@@ -75,15 +77,19 @@ export function ArtifactDocument({ artifact, artifacts = [] }: { artifact: Artif
   </section>;
 }
 
-export function ArtifactBrowser({ artifacts, selectedId, onSelect }: {
+export function ArtifactBrowser({ artifacts, selectedId, onSelect, snapshot, onSelectTool }: {
   artifacts: ArtifactView[]; selectedId: string | null; onSelect: (id: string) => void;
+  snapshot?: Snapshot | null; onSelectTool?: (id: string) => void;
 }) {
   const selected = artifacts.find(artifact => artifact.id === selectedId);
   return <div className="artifact-browser"><ul className="artifact-list">{artifacts.map(artifact =>
     <li key={artifact.id}><button type="button" className="artifact-select" aria-pressed={artifact.id === selectedId} data-artifact-id={artifact.id}
       aria-label={artifactLabel(artifact) + (artifact.artifact_type === 'source_code' ? ' · ' + artifact.relative_path : '') + ' · v' + artifact.version} onClick={() => onSelect(artifact.id)}><FileText size={16} /><span className="artifact-name"><strong>{artifactLabel(artifact)}</strong><small>{artifact.relative_path}</small></span><span>v{artifact.version}</span></button>
-      <span className="document-origin">{artifact.provenance?.origin === 'test' ? 'ТЕСТ' : artifact.provenance?.origin ?? 'Источник неизвестен'}</span>
-    </li>)}</ul>{selected ? <ArtifactDocument key={selected.id} artifact={selected} artifacts={artifacts} /> : null}</div>;
+      <span className="document-origin">{artifact.provenance?.origin === 'test' && artifact.provenance.producer_id == null ? 'Доверенная тестовая инъекция' : artifact.provenance?.origin === 'test' ? 'ТЕСТ' : artifact.provenance?.origin ?? 'Источник неизвестен'}</span>
+    </li>)}</ul>{selected ? ['test_report', 'bug', 'tool_report'].includes(selected.artifact_type)
+      ? snapshot && onSelectTool ? <QualityArtifactDocument key={snapshot.run.id + ':' + selected.id} artifact={selected} snapshot={snapshot} onSelectArtifact={onSelect} onSelectTool={onSelectTool} />
+        : <p className="resource-error" role="alert">Для проверки документа QA нужны данные выбранного запуска.</p>
+      : <ArtifactDocument key={selected.id} artifact={selected} artifacts={artifacts} /> : null}</div>;
 }
 
 function AttemptTracePanel({ attempt }: { attempt: AgentRunView }) {
@@ -104,7 +110,7 @@ export function AttemptList({ attempts, artifacts, tasks = [], onSelectArtifact,
     const task = tasks.find(item => item.id === attempt.task_id);
     return (
     <li key={attempt.id} className="attempt-entry" data-attempt-id={attempt.id}>
-      <div className="attempt-heading"><strong>{(task ? roleDetails[task.role].name + ' · ' : '') + 'Попытка ' + attempt.number}</strong><span className={'task-status status-' + attempt.status}>{attemptLabels[attempt.status]}</span></div>
+      <div className="attempt-heading"><strong>{(task ? roleDetails[task.role].name + ' · ' : '') + (task && task.iteration > 0 ? 'Итерация исправления ' + task.iteration + ' · ' : '') + 'Попытка ' + attempt.number}</strong><span className={'task-status status-' + attempt.status}>{attemptLabels[attempt.status]}</span></div>
       <p className="field-hint">{attempt.provider === 'test' ? 'ТЕСТ · заглушка' : attempt.provider} · {attempt.model ?? 'Модель неизвестна'}</p>
       <p className="field-hint"><time dateTime={attempt.created_at}>{formatTime(attempt.created_at, true)}</time> · {attempt.latency_ms != null ? `${Math.round(attempt.latency_ms)} мс` : 'Время неизвестно'} · {attempt.cost_usd != null ? `$${attempt.cost_usd.toFixed(4)}` : 'Стоимость неизвестна'}</p>
       {attempt.error_message ? <p className="attempt-error" role="status">{attempt.error_message}</p> : null}
@@ -125,9 +131,9 @@ export function AttemptList({ attempts, artifacts, tasks = [], onSelectArtifact,
   })}</ol>;
 }
 
-export function DecisionCard({ decision, artifacts, pending, connected, onResolve, onSelectArtifact, sourceEnabled = false }: {
+export function DecisionCard({ decision, artifacts, pending, connected, onResolve, onSelectArtifact, sourceEnabled = false, qualityEnabled = false }: {
   decision: DecisionView; artifacts: ArtifactView[]; pending: boolean; connected: boolean;
-  onResolve: ResolveDecision; onSelectArtifact: (id: string) => void; sourceEnabled?: boolean;
+  onResolve: ResolveDecision; onSelectArtifact: (id: string) => void; sourceEnabled?: boolean; qualityEnabled?: boolean;
 }) {
   const [comment, setComment] = useState('');
   const [riskAccepted, setRiskAccepted] = useState(false);
@@ -151,7 +157,8 @@ export function DecisionCard({ decision, artifacts, pending, connected, onResolv
         : uncertain ? <p className="decision-risk">Исход предыдущей отправки неизвестен. Повтор может создать дублирующий вызов и дополнительные расходы. Подтверждайте отказ только при известном результате.</p>
         : decision.kind === 'file_conflict' ? <p className="field-hint">Набор файлов не применён. Повтор получит актуальную основу и создаст новую попытку инженера.</p>
         : <p className="field-hint">Принятие завершит оценку CTO без нового вызова провайдера. {sourceEnabled
-          ? 'Backend и Frontend подготовят исходный код кандидата. Проверки Runner доступны во вкладке «Проверки» после сохранения версии и подключения worker. QA и preview пока недоступны.'
+          ? qualityEnabled ? 'Backend и Frontend подготовят исходный код кандидата. Затем worker выполнит реальные проверки Python, HTTP и сборку, а QA сохранит отчёт. Preview пока недоступен.'
+            : 'Backend и Frontend подготовят исходный код кандидата. Проверки Runner доступны во вкладке «Проверки» после сохранения версии и подключения worker. QA и preview пока недоступны.'
           : 'Разработка Clinic Demo на следующем этапе пока недоступна.'}</p>}
       <label className="decision-comment"><span>{uncertain ? 'Объяснение · минимум 10 символов' : 'Комментарий к решению (необязательно)'}</span>
         <textarea value={comment} onChange={event => setComment(event.target.value)} rows={2} maxLength={4000} disabled={pending} />

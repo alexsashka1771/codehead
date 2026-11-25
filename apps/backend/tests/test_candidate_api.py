@@ -69,7 +69,7 @@ def test_source_content_is_returned_as_json_data_with_nosniff(client, prepared):
     assert response.headers["x-content-type-options"] == "nosniff"
 
 
-def test_capabilities_advertise_engineer_files_without_claiming_qa_or_preview(client, database):
+def test_capabilities_advertise_engineer_files_and_qa_without_preview(client, database):
     WorkerService(database).register("candidate-api-capabilities")
     response = client.get("/api/capabilities")
     assert response.status_code == 200
@@ -78,7 +78,7 @@ def test_capabilities_advertise_engineer_files_without_claiming_qa_or_preview(cl
     assert capabilities["candidate_files"]["status"] == "available"
     assert "Backend" in capabilities["candidate_files"]["reason"]
     assert "Frontend" in capabilities["candidate_files"]["reason"]
-    assert capabilities["qa_execution"]["status"] == "planned"
+    assert capabilities["qa_execution"]["status"] == "available"
     assert capabilities["preview"]["status"] == "planned"
     assert client.get("/health").json()["stage"] == "worker"
 

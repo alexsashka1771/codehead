@@ -618,6 +618,117 @@
       "title": "AttemptTrace",
       "type": "object"
     },
+    "Bug": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "tree_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Tree Hash",
+          "type": "string"
+        },
+        "manifest_artifact_id": {
+          "title": "Manifest Artifact Id",
+          "type": "string"
+        },
+        "manifest_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Manifest Hash",
+          "type": "string"
+        },
+        "profile_version": {
+          "title": "Profile Version",
+          "type": "string"
+        },
+        "profile_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Profile Hash",
+          "type": "string"
+        },
+        "acceptance_suite_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Acceptance Suite Hash",
+          "type": "string"
+        },
+        "template_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Template Hash",
+          "type": "string"
+        },
+        "cycle_id": {
+          "title": "Cycle Id",
+          "type": "string"
+        },
+        "iteration": {
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Iteration",
+          "type": "integer"
+        },
+        "status": {
+          "const": "open",
+          "default": "open",
+          "title": "Status",
+          "type": "string"
+        },
+        "tool_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tool Run Ids",
+          "type": "array"
+        },
+        "requirement_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Requirement Ids",
+          "type": "array"
+        },
+        "summary": {
+          "maxLength": 8000,
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "task_id",
+        "candidate_id",
+        "revision",
+        "tree_hash",
+        "manifest_artifact_id",
+        "manifest_hash",
+        "profile_version",
+        "profile_hash",
+        "acceptance_suite_hash",
+        "template_hash",
+        "cycle_id",
+        "iteration",
+        "tool_run_ids",
+        "requirement_ids",
+        "summary"
+      ],
+      "title": "Bug",
+      "type": "object"
+    },
     "CandidateFileView": {
       "additionalProperties": false,
       "properties": {
@@ -1380,6 +1491,263 @@
         "created_at"
       ],
       "title": "ProjectView",
+      "type": "object"
+    },
+    "ProposedTest": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "requirement_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Requirement Ids",
+          "type": "array"
+        },
+        "status": {
+          "const": "proposed",
+          "default": "proposed",
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "requirement_ids"
+      ],
+      "title": "ProposedTest",
+      "type": "object"
+    },
+    "QualityCycleView": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "tree_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Tree Hash",
+          "type": "string"
+        },
+        "manifest_artifact_id": {
+          "title": "Manifest Artifact Id",
+          "type": "string"
+        },
+        "manifest_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Manifest Hash",
+          "type": "string"
+        },
+        "profile_version": {
+          "title": "Profile Version",
+          "type": "string"
+        },
+        "profile_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Profile Hash",
+          "type": "string"
+        },
+        "acceptance_suite_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Acceptance Suite Hash",
+          "type": "string"
+        },
+        "template_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Template Hash",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "iteration": {
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Iteration",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "created",
+            "testing",
+            "analyzing",
+            "passed",
+            "failed",
+            "blocked",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "tool_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tool Run Ids",
+          "type": "array"
+        },
+        "tool_report_artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tool Report Artifact Ids",
+          "type": "array"
+        },
+        "report_artifact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Report Artifact Id"
+        },
+        "bug_artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Bug Artifact Ids",
+          "type": "array"
+        },
+        "repair_task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repair Task Id"
+        },
+        "followup_task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Followup Task Id"
+        },
+        "blocked_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Blocked Reason"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        }
+      },
+      "required": [
+        "run_id",
+        "task_id",
+        "candidate_id",
+        "revision",
+        "tree_hash",
+        "manifest_artifact_id",
+        "manifest_hash",
+        "profile_version",
+        "profile_hash",
+        "acceptance_suite_hash",
+        "template_hash",
+        "id",
+        "iteration",
+        "status",
+        "tool_run_ids",
+        "created_at"
+      ],
+      "title": "QualityCycleView",
+      "type": "object"
+    },
+    "RequirementCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "requirement_id": {
+          "enum": [
+            "REQ-001",
+            "REQ-002",
+            "REQ-003",
+            "REQ-004",
+            "REQ-005",
+            "REQ-006",
+            "REQ-007",
+            "REQ-008"
+          ],
+          "title": "Requirement Id",
+          "type": "string"
+        },
+        "tool_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tool Run Ids",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "not_verified"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "requirement_id",
+        "tool_run_ids",
+        "status"
+      ],
+      "title": "RequirementCheck",
       "type": "object"
     },
     "Role": {
@@ -2216,6 +2584,21 @@
           ],
           "default": null,
           "title": "Template Hash"
+        },
+        "test_scenario": {
+          "default": "standard",
+          "enum": [
+            "standard",
+            "repair_success",
+            "repair_blocked"
+          ],
+          "title": "Test Scenario",
+          "type": "string"
+        },
+        "injection_done": {
+          "default": false,
+          "title": "Injection Done",
+          "type": "boolean"
         }
       },
       "required": [
@@ -2332,6 +2715,13 @@
           },
           "title": "Tool Runs",
           "type": "array"
+        },
+        "quality_cycles": {
+          "items": {
+            "$ref": "#/$defs/QualityCycleView"
+          },
+          "title": "Quality Cycles",
+          "type": "array"
         }
       },
       "required": [
@@ -2359,6 +2749,25 @@
         },
         "limits": {
           "$ref": "#/$defs/RunLimits"
+        },
+        "workflow_version": {
+          "default": "clinic-v3",
+          "enum": [
+            "clinic-v2",
+            "clinic-v3"
+          ],
+          "title": "Workflow Version",
+          "type": "string"
+        },
+        "test_scenario": {
+          "default": "standard",
+          "enum": [
+            "standard",
+            "repair_success",
+            "repair_blocked"
+          ],
+          "title": "Test Scenario",
+          "type": "string"
         }
       },
       "title": "StartRun",
@@ -2608,6 +3017,128 @@
         "created_at"
       ],
       "title": "TaskView",
+      "type": "object"
+    },
+    "TestReport": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "tree_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Tree Hash",
+          "type": "string"
+        },
+        "manifest_artifact_id": {
+          "title": "Manifest Artifact Id",
+          "type": "string"
+        },
+        "manifest_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Manifest Hash",
+          "type": "string"
+        },
+        "profile_version": {
+          "title": "Profile Version",
+          "type": "string"
+        },
+        "profile_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Profile Hash",
+          "type": "string"
+        },
+        "acceptance_suite_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Acceptance Suite Hash",
+          "type": "string"
+        },
+        "template_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Template Hash",
+          "type": "string"
+        },
+        "cycle_id": {
+          "title": "Cycle Id",
+          "type": "string"
+        },
+        "iteration": {
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Iteration",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "tool_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tool Run Ids",
+          "type": "array"
+        },
+        "requirements": {
+          "items": {
+            "$ref": "#/$defs/RequirementCheck"
+          },
+          "title": "Requirements",
+          "type": "array"
+        },
+        "proposed_tests": {
+          "items": {
+            "$ref": "#/$defs/ProposedTest"
+          },
+          "title": "Proposed Tests",
+          "type": "array"
+        },
+        "resolves_bug_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Resolves Bug Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run_id",
+        "task_id",
+        "candidate_id",
+        "revision",
+        "tree_hash",
+        "manifest_artifact_id",
+        "manifest_hash",
+        "profile_version",
+        "profile_hash",
+        "acceptance_suite_hash",
+        "template_hash",
+        "cycle_id",
+        "iteration",
+        "status",
+        "tool_run_ids",
+        "requirements",
+        "proposed_tests"
+      ],
+      "title": "TestReport",
       "type": "object"
     },
     "ToolCommand": {
@@ -2908,6 +3439,18 @@
           ],
           "default": null,
           "title": "Lease Expires At"
+        },
+        "qa_cycle_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Qa Cycle Id"
         }
       },
       "required": [
@@ -3197,6 +3740,13 @@
           },
           "title": "Tool Runs",
           "type": "array"
+        },
+        "quality_cycles": {
+          "items": {
+            "$ref": "#/$defs/QualityCycleView"
+          },
+          "title": "Quality Cycles",
+          "type": "array"
         }
       },
       "required": [
@@ -3259,6 +3809,12 @@
     },
     "tool_command": {
       "$ref": "#/$defs/ToolCommand"
+    },
+    "test_report": {
+      "$ref": "#/$defs/TestReport"
+    },
+    "bug": {
+      "$ref": "#/$defs/Bug"
     }
   },
   "required": [
@@ -3276,7 +3832,9 @@
     "artifact_content",
     "attempt_trace",
     "file_proposal",
-    "tool_command"
+    "tool_command",
+    "test_report",
+    "bug"
   ],
   "title": "ContractBundle",
   "type": "object"

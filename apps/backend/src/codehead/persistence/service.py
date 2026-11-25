@@ -23,6 +23,7 @@ from codehead.contracts import (
     DomainEvent,
     EventsPage,
     ProjectView,
+    QualityCycleView,
     RunCancelledEvent,
     RunCommand,
     RunCreatedEvent,
@@ -54,6 +55,7 @@ from codehead.persistence.models import (
     Decision,
     Event,
     Project,
+    QualityCycle,
     Run,
     Task,
     WorkerHeartbeat,
@@ -64,7 +66,6 @@ from codehead.workflow.definition import (
     ROLE_DEFINITIONS,
     ROLE_ORDER,
     TASK_TYPES,
-    WORKFLOW_VERSION,
 )
 from codehead.workflow.transitions import transition_run
 
@@ -84,6 +85,10 @@ def identifier() -> str:
 def payload_hash(payload) -> str:
     value = payload.model_dump(mode="json")
     if isinstance(payload, StartRun):
+        if value.get("workflow_version") == "clinic-v3":
+            value.pop("workflow_version", None)
+        if value.get("test_scenario") == "standard":
+            value.pop("test_scenario", None)
         file_defaults = {
             "max_file_bytes": 65536,
             "max_files_per_proposal": 4,
@@ -269,7 +274,19 @@ class ProjectService(ToolTransactions):
             usage=self._usage(session, run),
             candidate=candidate_view(session, run.id),
             tool_runs=[ToolRunView.model_validate(tool) for tool in self._tools(session, run.id)],
+            quality_cycles=self._quality_views(session, run.id),
         )
+
+    @staticmethod
+    def _quality_views(session, run_id):
+        return [
+            QualityCycleView.model_validate(cycle)
+            for cycle in session.scalars(
+                select(QualityCycle)
+                .where(QualityCycle.run_id == run_id)
+                .order_by(QualityCycle.iteration)
+            )
+        ]
 
     def _emit_workflow(
         self, session, run, action, *, actor_id="worker", task_id=None, correlation_id=None
@@ -290,6 +307,15 @@ class ProjectService(ToolTransactions):
         if run.pause_requested or run.cancel_requested:
             for tool in tools:
                 if tool.status == "created":
+                    if (
+                        tool.qa_cycle_id is not None
+                        and run.pause_requested
+                        and not run.cancel_requested
+                    ):
+                        if tool.lease_owner is not None:
+                            tool.lease_owner, tool.lease_expires_at = None, None
+                            tool.fencing_token += 1
+                        continue
                     tool.status, tool.finished_at = "cancelled", self.clock()
                     tool.lease_owner, tool.lease_expires_at = None, None
                     tool.fencing_token += 1
@@ -333,6 +359,11 @@ class ProjectService(ToolTransactions):
             else:
                 run.status, run.finished_at = "cancelled", now()
                 run.blocked_reason = None
+                for cycle in session.scalars(
+                    select(QualityCycle).where(QualityCycle.run_id == run.id)
+                ):
+                    if cycle.status in {"created", "testing", "analyzing", "blocked"}:
+                        cycle.status, cycle.finished_at = "cancelled", self.clock()
                 for task in self._tasks(session, run.id):
                     if task.status not in TERMINAL_RUNS:
                         task.status = "cancelled"
@@ -448,7 +479,9 @@ class ProjectService(ToolTransactions):
                 id=identifier(),
                 project_id=project_id,
                 mode=command.mode,
-                workflow_version=WORKFLOW_VERSION,
+                workflow_version=command.workflow_version,
+                test_scenario=command.test_scenario,
+                injection_done=False,
                 requirements_version=project.requirements_version,
                 profile_version=profile.id,
                 profile_hash=profile.profile_hash,
@@ -685,6 +718,7 @@ class ProjectService(ToolTransactions):
                 tool_runs=[
                     ToolRunView.model_validate(tool) for tool in self._tools(session, run.id)
                 ],
+                quality_cycles=self._quality_views(session, run.id),
             )
 
     def usage(self, run_id: str) -> UsageSummary:
@@ -770,12 +804,18 @@ class ProjectService(ToolTransactions):
                 content=artifact.content_text,
             )
 
-    def worker_connected(self, *, required_roles=(), required_tools=()):
+    def worker_connected(self, *, required_roles=(), required_tools=(), require_single=False):
         self.refresh_worker_presence()
         with self.database.read() as session:
             workers = list(
                 session.scalars(select(WorkerHeartbeat).where(WorkerHeartbeat.expires_at > now()))
             )
+            if require_single:
+                return any(
+                    set(required_roles) <= set(worker.supported_roles)
+                    and set(required_tools) <= set(worker.supported_tools)
+                    for worker in workers
+                )
             roles = {role for worker in workers for role in worker.supported_roles}
             tools = {tool for worker in workers for tool in worker.supported_tools}
             return bool(workers) and set(required_roles) <= roles and set(required_tools) <= tools
@@ -852,7 +892,7 @@ class ProjectService(ToolTransactions):
                 attempt = session.get(AgentRun, decision.attempt_id)
                 if (
                     decision.kind != "file_conflict"
-                    or run.workflow_version != "clinic-v2"
+                    or run.workflow_version not in {"clinic-v2", "clinic-v3"}
                     or task.role not in {"backend", "frontend"}
                     or task.status != "waiting_for_decision"
                     or attempt is None

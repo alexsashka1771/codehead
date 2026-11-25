@@ -76,6 +76,12 @@ class Run(Base):
     profile_hash: Mapped[str | None] = mapped_column(String(64))
     acceptance_suite_hash: Mapped[str | None] = mapped_column(String(64))
     template_hash: Mapped[str | None] = mapped_column(String(64))
+    test_scenario: Mapped[str] = mapped_column(
+        String(32), default="standard", server_default="standard"
+    )
+    injection_done: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
 
 
 class Task(Base):
@@ -318,6 +324,43 @@ class ToolRun(Base):
     fencing_token: Mapped[int] = mapped_column(BigInteger, default=0)
     lease_owner: Mapped[str | None] = mapped_column(String(100))
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    qa_cycle_id: Mapped[str | None] = mapped_column(ForeignKey("quality_cycles.id"), index=True)
+
+
+class QualityCycle(Base):
+    __tablename__ = "quality_cycles"
+    __table_args__ = (
+        UniqueConstraint("run_id", "task_id", name="uq_quality_task"),
+        UniqueConstraint("run_id", "iteration", name="uq_quality_iteration"),
+        CheckConstraint("iteration BETWEEN 0 AND 2 AND revision >= 1", name="ck_quality_versions"),
+        CheckConstraint(
+            "status IN ('created','testing','analyzing','passed','failed','blocked','cancelled')",
+            name="ck_quality_status",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), index=True)
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"))
+    candidate_id: Mapped[str] = mapped_column(ForeignKey("candidates.id"))
+    iteration: Mapped[int] = mapped_column(Integer)
+    revision: Mapped[int] = mapped_column(Integer)
+    tree_hash: Mapped[str] = mapped_column(String(64))
+    manifest_artifact_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"))
+    manifest_hash: Mapped[str] = mapped_column(String(64))
+    profile_version: Mapped[str] = mapped_column(String(40))
+    profile_hash: Mapped[str] = mapped_column(String(64))
+    acceptance_suite_hash: Mapped[str] = mapped_column(String(64))
+    template_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(24))
+    tool_run_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    tool_report_artifact_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    report_artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"))
+    bug_artifact_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    repair_task_id: Mapped[str | None] = mapped_column(ForeignKey("tasks.id"))
+    followup_task_id: Mapped[str | None] = mapped_column(ForeignKey("tasks.id"))
+    blocked_reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Event(Base):

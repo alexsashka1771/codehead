@@ -81,6 +81,8 @@ def clean_file_bases(request):
         raise ProviderFailure("invalid_file_bases", "Нужен полный список основы файлов роли.")
     referenced = {base["artifact_id"] for base in bases if base["artifact_id"] is not None}
     documents = {"requirements", "architecture", "api_contract", "decision"}
+    if request.repair_context is not None:
+        documents |= {"bug", "test_report", "tool_report"}
     if any(
         item["artifact_type"] not in documents
         and not (item["artifact_type"] == "source_code" and item["id"] in referenced)
@@ -107,6 +109,17 @@ def propose_files(request, secrets):
             if len(raw) > maximum:
                 raise InvalidFile("Fixture вырос сверх допустимого размера.")
             content = raw.decode("utf-8", errors="strict")
+            if (
+                request.repair_context is not None
+                and path == "backend/clinic_storage.py"
+                and request.repair_context["test_scenario"] != "standard"
+            ):
+                from codehead.clinic.quality_fixtures import repair_storage_fixture
+
+                fixture = repair_storage_fixture(
+                    request.repair_context["test_scenario"], request.repair_context["iteration"]
+                )
+                content = fixture.content
             if path == "frontend/src/App.tsx":
                 marker = 'const CLINIC_NAME = "Clinic Demo";'
                 if content.count(marker) != 1:

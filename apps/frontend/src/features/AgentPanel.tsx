@@ -30,8 +30,9 @@ export function AgentStrip({ roles, agents, selected, onSelect, hasRun }: Props)
   </nav>;
 }
 
-export function AgentPanel({ definition, snapshot, active, connected, pending, onResolve }: {
+export function AgentPanel({ definition, snapshot, active, connected, pending, onResolve, onSelectTool }: {
   definition: RoleDefinition; snapshot: Snapshot | null; active: boolean; connected: boolean; pending: boolean; onResolve: ResolveDecision;
+  onSelectTool?: (id: string) => void;
 }) {
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
   const details = roleDetails[definition.role];
@@ -69,12 +70,12 @@ export function AgentPanel({ definition, snapshot, active, connected, pending, o
       <details><summary>Входы задачи</summary><InputVersions versions={task.input_versions} artifacts={snapshot?.artifacts} onSelectArtifact={setSelectedArtifactId} />
         <p className="field-hint">Версия записи {task.record_version} · fencing token {task.fencing_token ?? 0}</p></details>
       {decisions.map(decision => <DecisionCard key={decision.id + ':' + decision.version} decision={decision}
-        sourceEnabled={snapshot?.run.workflow_version === 'clinic-v2'}
+        sourceEnabled={['clinic-v2', 'clinic-v3'].includes(snapshot?.run.workflow_version ?? '')} qualityEnabled={snapshot?.run.workflow_version === 'clinic-v3'}
         artifacts={snapshot?.artifacts ?? []} pending={pending} connected={connected} onResolve={onResolve} onSelectArtifact={setSelectedArtifactId} />)}
       {attempts.length ? <><h3 className="workflow-subheading">Попытки</h3><AttemptList attempts={attempts} artifacts={snapshot?.artifacts ?? []}
-        onSelectArtifact={setSelectedArtifactId} active={active} /></> : <p className="field-hint">Попыток выполнения пока нет.</p>}
+        onSelectArtifact={setSelectedArtifactId} tasks={snapshot?.tasks} active={active} /></> : <p className="field-hint">Попыток выполнения пока нет.</p>}
       {visibleArtifacts.length ? <><h3 className="workflow-subheading">Документы и входы</h3><ArtifactBrowser artifacts={visibleArtifacts}
-        selectedId={active ? selectedArtifactId : null} onSelect={setSelectedArtifactId} /></> : null}
+        selectedId={active ? selectedArtifactId : null} onSelect={setSelectedArtifactId} snapshot={snapshot} onSelectTool={onSelectTool} /></> : null}
     </div> : null}
     <a className="model-preview-link" href={previewUrl.pathname + previewUrl.search}><Play size={14} />Посмотреть анимации модели</a>
   </section>;

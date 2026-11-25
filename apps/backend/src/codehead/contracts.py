@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Contract(BaseModel):
@@ -92,6 +92,16 @@ class ProjectView(CreateProject):
 class StartRun(Contract):
     mode: Literal["live", "test"] = "live"
     limits: RunLimits = Field(default_factory=RunLimits)
+    workflow_version: Literal["clinic-v2", "clinic-v3"] = "clinic-v3"
+    test_scenario: Literal["standard", "repair_success", "repair_blocked"] = "standard"
+
+    @model_validator(mode="after")
+    def scenario_scope(self):
+        if self.test_scenario != "standard" and (
+            self.mode != "test" or self.workflow_version != "clinic-v3"
+        ):
+            raise ValueError("Repair scenarios require test clinic-v3")
+        return self
 
 
 class RunView(Contract):
@@ -113,6 +123,8 @@ class RunView(Contract):
     profile_hash: str | None = None
     acceptance_suite_hash: str | None = None
     template_hash: str | None = None
+    test_scenario: Literal["standard", "repair_success", "repair_blocked"] = "standard"
+    injection_done: bool = False
 
 
 class TaskView(Contract):
@@ -290,6 +302,7 @@ class ToolRunView(ToolCommand):
     fencing_token: int = Field(default=0, ge=0)
     lease_owner: str | None = None
     lease_expires_at: datetime | None = None
+    qa_cycle_id: str | None = None
 
     @field_validator("created_at", "started_at", "finished_at", "lease_expires_at")
     @classmethod
@@ -345,6 +358,68 @@ class AttemptTrace(Contract):
     redaction_version: str
 
 
+class QualityPins(Contract):
+    run_id: str
+    task_id: str
+    candidate_id: str
+    revision: int = Field(ge=1)
+    tree_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    manifest_artifact_id: str
+    manifest_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    profile_version: str
+    profile_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    acceptance_suite_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    template_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class QualityCycleView(QualityPins):
+    id: str
+    iteration: int = Field(ge=0, le=2)
+    status: Literal["created", "testing", "analyzing", "passed", "failed", "blocked", "cancelled"]
+    tool_run_ids: list[str]
+    tool_report_artifact_ids: list[str] = Field(default_factory=list)
+    report_artifact_id: str | None = None
+    bug_artifact_ids: list[str] = Field(default_factory=list)
+    repair_task_id: str | None = None
+    followup_task_id: str | None = None
+    blocked_reason: str | None = None
+    created_at: datetime
+    finished_at: datetime | None = None
+
+
+class RequirementCheck(Contract):
+    requirement_id: Literal[
+        "REQ-001", "REQ-002", "REQ-003", "REQ-004", "REQ-005", "REQ-006", "REQ-007", "REQ-008"
+    ]
+    tool_run_ids: list[str]
+    status: Literal["passed", "failed", "not_verified"]
+
+
+class ProposedTest(Contract):
+    title: str = Field(min_length=1, max_length=500)
+    requirement_ids: list[str]
+    status: Literal["proposed"] = "proposed"
+
+
+class TestReport(QualityPins):
+    cycle_id: str
+    iteration: int = Field(ge=0, le=2)
+    status: Literal["passed", "failed"]
+    tool_run_ids: list[str]
+    requirements: list[RequirementCheck]
+    proposed_tests: list[ProposedTest]
+    resolves_bug_ids: list[str] = Field(default_factory=list)
+
+
+class Bug(QualityPins):
+    cycle_id: str
+    iteration: int = Field(ge=0, le=2)
+    status: Literal["open"] = "open"
+    tool_run_ids: list[str]
+    requirement_ids: list[str]
+    summary: str = Field(min_length=1, max_length=8000)
+
+
 class Snapshot(Contract):
     schema_version: Literal[1] = 1
     project: ProjectView
@@ -358,6 +433,7 @@ class Snapshot(Contract):
     usage: UsageSummary | None = None
     candidate: CandidateView | None = None
     tool_runs: list[ToolRunView] = Field(default_factory=list)
+    quality_cycles: list[QualityCycleView] = Field(default_factory=list)
 
 
 class EventEnvelope(Contract):
@@ -398,6 +474,7 @@ class WorkflowUpdatedPayload(RunStatePayload):
     usage: UsageSummary
     candidate: CandidateView | None = None
     tool_runs: list[ToolRunView] = Field(default_factory=list)
+    quality_cycles: list[QualityCycleView] = Field(default_factory=list)
 
 
 class WorkflowUpdatedEvent(EventEnvelope):
@@ -526,3 +603,5 @@ class ContractBundle(Contract):
     attempt_trace: AttemptTrace
     file_proposal: FileProposal
     tool_command: ToolCommand
+    test_report: TestReport
+    bug: Bug

@@ -1,4 +1,10 @@
-# План реализации: Runner проверок, подэтап 4.1
+# План реализации: QA и repair, подэтап 4.2
+
+25 ноября 2026 подэтап 4.2 проверен по [QA_DESIGN](QA_DESIGN.md) / [QA_PLAN](QA_PLAN.md) в ветке codex/qa-repair от Runner. Новый clinic-v3 автоматически выполняет три ToolRun и QA; failed gate создаёт новые Backend/QA задачи с ограничением двух repair. Standard, red→green и initial+две red подтверждены настоящим внешним suite. Интерфейс показывает последний результат, историю, TestReport/Bug, источники и repair; spec/quality reviews и визуальная правка одобрены. Проверки: backend 572, frontend 370, 23 базовых и 12 worker E2E, check/build прошли. Фактические логи и ограничения — [QA_REPORT](QA_REPORT.md). Пользовательская PostgreSQL сохранена, платные вызовы и локальная модель не подключались.
+
+Следующий подэтап 4.3 — DevOps и preview отдельного origin. Старые clinic-v1/v2 сохраняют свои границы и историю. Python/HTTP/build доступны в Runner; готовность Live и preview не объявляется.
+
+## История: Runner 4.1
 
 24 ноября 2026 автор попросил двигаться дальше. Подэтап 4.1 — [RUNNER_DESIGN](RUNNER_DESIGN.md), [RUNNER_PLAN](RUNNER_PLAN.md): три ручные доверенные проверки ready test-кандидата, сохраняемые ToolRun, короткая API-очередь и отдельный worker. Результаты и ограничения — [RUNNER_REPORT](RUNNER_REPORT.md). Рабочая ветка — codex/runner-checks; порядок Git прежний.
 

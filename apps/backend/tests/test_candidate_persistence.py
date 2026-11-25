@@ -29,7 +29,9 @@ def test_rejected_template_does_not_leave_pending_artifacts(database):
         CreateProject(name="Rejected template", description="Synthetic template validation."),
         "rejected-project",
     )
-    run = service.start_run(project.id, StartRun(mode="test"), "rejected-run", "rejected")
+    run = service.start_run(
+        project.id, StartRun(workflow_version="clinic-v2", mode="test"), "rejected-run", "rejected"
+    )
     profile = SimpleNamespace(
         id="clinic_demo/v1",
         profile_hash="a" * 64,
@@ -70,7 +72,12 @@ def prepared(database):
         CreateProject(name="Candidate clinic", description="Synthetic clinic candidate."),
         "candidate-project",
     )
-    run = service.start_run(project.id, StartRun(mode="test"), "candidate-run", "candidate")
+    run = service.start_run(
+        project.id,
+        StartRun(workflow_version="clinic-v2", mode="test"),
+        "candidate-run",
+        "candidate",
+    )
     files = (TemplateFile("backend/main.py", "# Trusted entry\n"),)
     profile = SimpleNamespace(
         id="clinic_demo/v1",

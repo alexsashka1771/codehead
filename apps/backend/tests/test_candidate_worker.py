@@ -39,7 +39,9 @@ def create_run(database, *, parallel=2, mode="test", legacy=False):
     )
     run = service.start_run(
         project.id,
-        StartRun(mode=mode, limits=RunLimits(max_parallel_tasks=parallel)),
+        StartRun(
+            workflow_version="clinic-v2", mode=mode, limits=RunLimits(max_parallel_tasks=parallel)
+        ),
         "candidate-worker-run",
         "candidate-worker",
     )

@@ -2,7 +2,7 @@
 
 from codehead.contracts import Location, Role, RoleDefinition
 
-WORKFLOW_VERSION = "clinic-v2"
+WORKFLOW_VERSION = "clinic-v3"
 ROLE_DEFINITIONS = (
     RoleDefinition(
         role=Role.PRODUCT_MANAGER,

@@ -27,7 +27,8 @@ export function useWorkspace() {
   const pendingRef = useRef(false);
   const projectMutationVersion = useRef(0);
   const runMutationVersions = useRef(new Map<string, number>());
-  const startIntent = useRef<{ projectId: string; mode: StartRun['mode']; key: string } | null>(null);
+  const startIntent = useRef<{ projectId: string; mode: StartRun['mode']; scenario: StartRun['test_scenario']; key: string } | null>(null);
+  const [testScenario, setTestScenario] = useState<NonNullable<StartRun['test_scenario']>>('standard');
   const decisionIntent = useRef<{ fingerprint: string; key: string } | null>(null);
   const toolIntents = useRef(new Map<string, string>());
   const acceptedToolIntents = useRef(new Map<string, AcceptedTool>());
@@ -107,7 +108,8 @@ export function useWorkspace() {
     return () => controller.abort();
   }, [selection.projectId, revision]);
 
-  function selectProject(projectId: string) { selectionVersion.current += 1; selectionRef.current = { projectId, runId: null }; setSelection(selectionRef.current); }
+  function selectProject(projectId: string) { startIntent.current = null; selectionVersion.current += 1; selectionRef.current = { projectId, runId: null }; setSelection(selectionRef.current); }
+  function selectTestScenario(scenario: NonNullable<StartRun['test_scenario']>) { if (pendingRef.current) return; startIntent.current = null; setTestScenario(scenario); }
   function selectRun(runId: string) { selectionVersion.current += 1; selectionRef.current = { ...selectionRef.current, runId }; setSelection(selectionRef.current); setActionError(null); }
 
   function recordRunMutation(run: RunView) {
@@ -132,16 +134,17 @@ export function useWorkspace() {
     finally { pendingRef.current = false; setPending(null); }
   }
 
-  async function start(mode: StartRun['mode'] = 'live') {
+  async function start(mode: StartRun['mode'] = 'live', scenario: StartRun['test_scenario'] = testScenario) {
     const projectId = selectionRef.current.projectId;
     if (!projectId || pendingRef.current) return;
     pendingRef.current = true;
     setPending(mode === 'test' ? 'start-test' : 'start'); setActionError(null);
-    if (startIntent.current?.projectId !== projectId || startIntent.current.mode !== mode) {
-      startIntent.current = { projectId, mode, key: crypto.randomUUID() };
+    const selectedScenario = mode === 'test' ? scenario : 'standard';
+    if (startIntent.current?.projectId !== projectId || startIntent.current.mode !== mode || startIntent.current.scenario !== selectedScenario) {
+      startIntent.current = { projectId, mode, scenario: selectedScenario, key: crypto.randomUUID() };
     }
     try {
-      const run = await api.start(projectId, startIntent.current.key, mode);
+      const run = await api.start(projectId, startIntent.current.key, mode, selectedScenario);
       startIntent.current = null;
       recordRunMutation(run);
       if (selectionRef.current.projectId === projectId) {
@@ -192,7 +195,7 @@ export function useWorkspace() {
     const runId = selectionRef.current.runId;
     const candidate = snapshot.candidate;
     if (pendingRef.current || runId !== snapshot.run.id || !candidate || candidate.run_id !== runId
-      || candidate.status !== 'ready' || snapshot.run.mode !== 'test' || snapshot.run.workflow_version !== 'clinic-v2'
+      || candidate.status !== 'ready' || snapshot.run.mode !== 'test' || !['clinic-v2', 'clinic-v3'].includes(snapshot.run.workflow_version)
       || snapshot.run.pause_requested || snapshot.run.cancel_requested || ['paused', 'pausing', 'cancelled', 'failed', 'succeeded'].includes(snapshot.run.status)
       || command.workspace_id !== candidate.id || command.snapshot_version !== candidate.revision) return false;
     observeToolSnapshot(snapshot);
@@ -233,7 +236,7 @@ export function useWorkspace() {
   }
 
   return {
-    projects, runs, capabilities, loading, runsLoading, error, actionError, pending, selection, acceptedTools,
+    projects, runs, capabilities, loading, runsLoading, error, actionError, pending, selection, acceptedTools, testScenario, selectTestScenario,
     project: projects.find((project) => project.id === selection.projectId) ?? null,
     run: runs.find((run) => run.id === selection.runId) ?? null,
     selectProject, selectRun, createProject, start, command, resolveDecision, queueTool, observeToolSnapshot, refresh,

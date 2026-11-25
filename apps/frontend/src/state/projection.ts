@@ -42,9 +42,9 @@ export function applyEvent(snapshot: Snapshot, event: DomainEvent): Snapshot {
       return hydrateSnapshot({ ...snapshot, ...event.payload, run: { ...event.payload.run, ...cursor }, ...cursor });
     case 'workflow.updated': {
       if (event.payload.run.id !== snapshot.run.id) throw new ProjectionError('foreign_run');
-      const { run, tasks, agents, artifacts, agent_runs, decisions, usage, candidate, tool_runs } = event.payload;
+      const { run, tasks, agents, artifacts, agent_runs, decisions, usage, candidate, tool_runs, quality_cycles } = event.payload;
       return hydrateSnapshot({ ...snapshot, run: { ...run, ...cursor }, tasks, agents, artifacts,
-        agent_runs, decisions, usage, candidate: candidate ?? null, tool_runs: tool_runs ?? [], ...cursor });
+        agent_runs, decisions, usage, candidate: candidate ?? null, tool_runs: tool_runs ?? [], quality_cycles: quality_cycles ?? [], ...cursor });
     }
     default:
       throw new ProjectionError('unsupported_event');
@@ -67,7 +67,8 @@ function validatePayloadScope(snapshot: Snapshot, event: DomainEvent) {
   if ('agent_runs' in payload) check(payload.agent_runs);
   if ('decisions' in payload) check(payload.decisions);
   if ('tool_runs' in payload && payload.tool_runs) check(payload.tool_runs);
-  if ('tool_runs' in payload || ('decisions' in payload && payload.decisions.some(decision => decision.tool_run_id != null || decision.kind === 'tool_uncertain_outcome'))) {
+  if ('quality_cycles' in payload && payload.quality_cycles) check(payload.quality_cycles);
+  if ('quality_cycles' in payload || 'tool_runs' in payload || ('decisions' in payload && payload.decisions.some(decision => decision.tool_run_id != null || decision.kind === 'tool_uncertain_outcome'))) {
     hydrateSnapshot({ ...snapshot, ...payload, tool_runs: 'tool_runs' in payload ? payload.tool_runs ?? snapshot.tool_runs : snapshot.tool_runs,
       last_event_seq: 'run' in payload ? payload.run.last_event_seq : snapshot.last_event_seq });
   }
@@ -88,7 +89,7 @@ export function projectHistory(events: DomainEvent[], expectedLastSeq?: number):
     schema_version: 1, project: first.payload.project,
     run: { ...first.payload.run, last_event_seq: 0 },
     tasks: [], agents: [], artifacts: [], last_event_seq: 0,
-    agent_runs: [], decisions: [], usage: null, candidate: null, tool_runs: [],
+    agent_runs: [], decisions: [], usage: null, candidate: null, tool_runs: [], quality_cycles: [],
   };
   for (const [index, event] of events.entries()) {
     if (index > 0 && event.event_type === 'run.created') throw new ProjectionError('invalid_history');
@@ -125,6 +126,10 @@ export function normalizeSnapshot(snapshot: Snapshot): Snapshot {
       if (tool[field] != null) tool[field] = normalizeTimestamp(tool[field]);
     }
   }
+  for (const cycle of normalized.quality_cycles ?? []) {
+    cycle.created_at = normalizeTimestamp(cycle.created_at);
+    if (cycle.finished_at != null) cycle.finished_at = normalizeTimestamp(cycle.finished_at);
+  }
   if (normalized.candidate) {
     normalized.candidate.created_at = normalizeTimestamp(normalized.candidate.created_at);
     normalized.candidate.updated_at = normalizeTimestamp(normalized.candidate.updated_at);
@@ -137,6 +142,7 @@ export function normalizeSnapshot(snapshot: Snapshot): Snapshot {
   normalized.agent_runs?.sort(byId);
   normalized.decisions?.sort(byId);
   normalized.tool_runs?.sort(byId);
+  normalized.quality_cycles?.sort((left, right) => left.iteration - right.iteration);
   return normalized;
 }
 
@@ -148,6 +154,7 @@ function taskDefaults(task: TaskView): TaskView {
 function withCompatibilityDefaults(snapshot: Snapshot): Snapshot {
   return {
     ...snapshot, run: { ...snapshot.run, cancel_requested: snapshot.run.cancel_requested ?? false,
+      test_scenario: snapshot.run.test_scenario ?? 'standard', injection_done: snapshot.run.injection_done ?? false,
       pause_requested: snapshot.run.pause_requested ?? false,
       profile_version: snapshot.run.profile_version ?? null,
       profile_hash: snapshot.run.profile_hash ?? null,
@@ -159,7 +166,12 @@ function withCompatibilityDefaults(snapshot: Snapshot): Snapshot {
     candidate: snapshot.candidate ?? null,
     tasks: snapshot.tasks.map(taskDefaults), agent_runs: snapshot.agent_runs ?? [],
     decisions: (snapshot.decisions ?? []).map(decision => ({ ...decision, blocking: decision.blocking ?? true, tool_run_id: decision.tool_run_id ?? null })),
-    tool_runs: snapshot.tool_runs ?? [],
+    tool_runs: (snapshot.tool_runs ?? []).map(tool => ({ ...tool, qa_cycle_id: tool.qa_cycle_id ?? null })),
+    quality_cycles: (snapshot.quality_cycles ?? []).map(cycle => ({ ...cycle,
+      tool_report_artifact_ids: cycle.tool_report_artifact_ids ?? [], bug_artifact_ids: cycle.bug_artifact_ids ?? [],
+      report_artifact_id: cycle.report_artifact_id ?? null, repair_task_id: cycle.repair_task_id ?? null,
+      followup_task_id: cycle.followup_task_id ?? null, blocked_reason: cycle.blocked_reason ?? null,
+      finished_at: cycle.finished_at ?? null })),
     usage: snapshot.usage == null ? null : { ...snapshot.usage,
       source: snapshot.usage.source ?? 'unconfigured', cached_tokens: snapshot.usage.cached_tokens ?? null,
       latency_ms: snapshot.usage.latency_ms ?? null },
@@ -176,7 +188,7 @@ export function hydrateSnapshot(snapshot: Snapshot): Snapshot {
   const normalized = withCompatibilityDefaults(snapshot);
   if (normalized.candidate && normalized.candidate.run_id !== normalized.run.id) throw new ProjectionError('foreign_run');
   const collections = [normalized.tasks, normalized.agents, normalized.artifacts,
-    normalized.agent_runs ?? [], normalized.decisions ?? [], normalized.tool_runs ?? []];
+    normalized.agent_runs ?? [], normalized.decisions ?? [], normalized.tool_runs ?? [], normalized.quality_cycles ?? []];
   for (const collection of collections) {
     const ids = new Set<string>();
     for (const entity of collection) {
@@ -210,7 +222,106 @@ export function hydrateSnapshot(snapshot: Snapshot): Snapshot {
   }
   validateCandidate(normalized);
   validateTools(normalized);
+  validateQuality(normalized);
   return normalized;
+}
+
+function validateQuality(snapshot: Snapshot) {
+  const cycles = snapshot.quality_cycles ?? [];
+  const invalid = () => { throw new ProjectionError('invalid_event'); };
+  const artifacts = new Map(snapshot.artifacts.map(a => [a.id, a]));
+  const tools = new Map(snapshot.tool_runs?.map(t => [t.id, t]));
+  const tasks = new Map(snapshot.tasks.map(t => [t.id, t]));
+  const attempts = new Map(snapshot.agent_runs?.map(a => [a.id, a]));
+  const cycleIds = new Set(cycles.map(c => c.id));
+  const iterations = new Set<number>();
+  const unique = (ids: string[]) => ids.every(id => typeof id === 'string') && new Set(ids).size === ids.length;
+  for (const tool of snapshot.tool_runs ?? []) if (tool.qa_cycle_id != null && !cycleIds.has(tool.qa_cycle_id)) invalid();
+  for (const cycle of [...cycles].sort((a, b) => a.iteration - b.iteration)) {
+    const candidate = snapshot.candidate;
+    const task = tasks.get(cycle.task_id);
+    const manifest = artifacts.get(cycle.manifest_artifact_id);
+    if (!candidate || cycle.candidate_id !== candidate.id || !task || !manifest) throw new ProjectionError('foreign_run');
+    if (!Number.isInteger(cycle.iteration) || cycle.iteration < 0 || cycle.iteration > 2 || iterations.has(cycle.iteration)
+      || cycle.iteration !== iterations.size || task.role !== 'qa' || task.task_type !== 'quality_assurance' || task.iteration !== cycle.iteration
+      || !['created', 'testing', 'analyzing', 'passed', 'failed', 'blocked', 'cancelled'].includes(cycle.status)
+      || !Number.isSafeInteger(cycle.revision) || cycle.revision < 1 || cycle.revision > candidate.revision
+      || manifest.artifact_type !== 'candidate_manifest' || manifest.version !== cycle.revision || manifest.content_hash !== cycle.manifest_hash
+      || cycle.profile_version !== snapshot.run.profile_version || cycle.profile_hash !== snapshot.run.profile_hash
+      || cycle.acceptance_suite_hash !== snapshot.run.acceptance_suite_hash || cycle.template_hash !== candidate.template_hash
+      || ![cycle.tree_hash, cycle.manifest_hash, cycle.profile_hash, cycle.acceptance_suite_hash, cycle.template_hash].every(hash => /^[a-f0-9]{64}$/.test(hash))) invalid();
+    if (cycle.revision === candidate.revision && (cycle.tree_hash !== candidate.tree_hash || cycle.manifest_artifact_id !== candidate.manifest_artifact_id)) invalid();
+    iterations.add(cycle.iteration);
+    if (!unique(cycle.tool_run_ids) || cycle.tool_run_ids.length > 3 || !unique(cycle.tool_report_artifact_ids ?? []) || !unique(cycle.bug_artifact_ids ?? [])) invalid();
+    const operations = new Set<string>();
+    for (const id of cycle.tool_run_ids) {
+      const tool = tools.get(id);
+      if (!tool) throw new ProjectionError('foreign_run');
+      if (tool.qa_cycle_id !== cycle.id || tool.workspace_id !== cycle.candidate_id || tool.snapshot_version !== cycle.revision
+        || tool.tree_hash !== cycle.tree_hash || tool.manifest_artifact_id !== cycle.manifest_artifact_id || tool.manifest_hash !== cycle.manifest_hash
+        || tool.profile_version !== cycle.profile_version || tool.profile_hash !== cycle.profile_hash
+        || tool.acceptance_suite_hash !== cycle.acceptance_suite_hash || tool.template_hash !== cycle.template_hash
+        || !['validate_backend', 'test_backend', 'build_frontend'].includes(tool.operation_id) || operations.has(tool.operation_id)) invalid();
+      operations.add(tool.operation_id);
+    }
+    for (const tool of tools.values()) if (tool.qa_cycle_id === cycle.id && !cycle.tool_run_ids.includes(tool.id)) invalid();
+    const checkArtifact = (id: string, type: string) => {
+      const artifact = artifacts.get(id);
+      if (!artifact) throw new ProjectionError('foreign_run');
+      if (artifact.artifact_type !== type || artifact.task_id !== cycle.task_id || artifact.author_role !== 'qa'
+        || artifact.media_type !== 'application/json' || !/^[a-f0-9]{64}$/.test(artifact.content_hash)
+        || artifact.input_versions[cycle.manifest_artifact_id] !== cycle.revision) invalid();
+      for (const [input, version] of Object.entries(artifact.input_versions)) if (artifacts.get(input)?.version !== version) invalid();
+      if (type === 'tool_report') {
+        if (artifact.provenance?.origin !== 'tool' || !cycle.tool_run_ids.includes(artifact.provenance.producer_id ?? '')) invalid();
+      } else {
+        const producer = attempts.get(artifact.provenance?.producer_id ?? '');
+        if (!producer || producer.task_id !== cycle.task_id || producer.run_id !== cycle.run_id
+          || snapshot.agents.find(agent => agent.id === producer.agent_id)?.role !== 'qa'
+          || !['test', 'llm'].includes(artifact.provenance?.origin ?? '')) invalid();
+      }
+      return artifact;
+    };
+    const producers = new Set<string>();
+    for (const id of cycle.tool_report_artifact_ids ?? []) {
+      const report = checkArtifact(id, 'tool_report');
+      if (producers.has(report.provenance!.producer_id!)) invalid(); producers.add(report.provenance!.producer_id!);
+    }
+    if (cycle.report_artifact_id) checkArtifact(cycle.report_artifact_id, 'test_report');
+    for (const id of cycle.bug_artifact_ids ?? []) checkArtifact(id, 'bug');
+    if (['passed', 'failed'].includes(cycle.status) && (cycle.tool_run_ids.length !== 3
+      || cycle.tool_report_artifact_ids?.length !== 3 || !cycle.report_artifact_id)) invalid();
+    if (cycle.status === 'passed' && (cycle.bug_artifact_ids?.length || cycle.tool_run_ids.some(id => tools.get(id)?.status !== 'succeeded'))) invalid();
+    if (cycle.status === 'failed') {
+      const cycleTools = cycle.tool_run_ids.map(id => tools.get(id)!);
+      const http = cycleTools.find(tool => tool.operation_id === 'test_backend');
+      if (http?.status !== 'failed' || http.error_code !== 'tool_failed' || http.exit_code !== 1
+        || cycleTools.some(tool => tool.operation_id !== 'test_backend' && tool.status !== 'succeeded')) invalid();
+    }
+    if (cycle.repair_task_id != null || cycle.followup_task_id != null) {
+      const repair = tasks.get(cycle.repair_task_id ?? ''); const followup = tasks.get(cycle.followup_task_id ?? '');
+      if (!repair || !followup) throw new ProjectionError('foreign_run');
+      if (cycle.iteration >= 2 || !cycle.bug_artifact_ids?.length || repair.role !== 'backend' || repair.task_type !== 'backend_repair'
+        || repair.iteration !== cycle.iteration + 1 || !repair.dependencies.includes(cycle.task_id)
+        || followup.role !== 'qa' || followup.task_type !== 'quality_assurance' || followup.iteration !== repair.iteration
+        || !followup.dependencies.includes(repair.id)) invalid();
+    }
+  }
+  if (!cycles.length) return;
+  // Historical artifacts remain evidence even after a repaired candidate advances.
+  for (const artifact of snapshot.artifacts.filter(a => ['source_code', 'candidate_manifest'].includes(a.artifact_type))) {
+    for (const [id, version] of Object.entries(artifact.input_versions)) if (artifacts.get(id)?.version !== version) invalid();
+    const parentId = artifact.provenance?.parent_artifact_id;
+    if (parentId) {
+      const parent = artifacts.get(parentId);
+      if (!parent || parent.artifact_type !== artifact.artifact_type || parent.version >= artifact.version
+        || (artifact.artifact_type === 'source_code' && parent.relative_path !== artifact.relative_path)) invalid();
+    }
+    if (artifact.provenance?.producer_id) {
+      const producer = attempts.get(artifact.provenance.producer_id);
+      if (!producer || producer.task_id !== artifact.task_id || tasks.get(producer.task_id)?.role !== artifact.author_role) invalid();
+    }
+  }
 }
 
 function validateTools(snapshot: Snapshot) {

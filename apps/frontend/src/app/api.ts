@@ -61,6 +61,7 @@ async function post<T>(path: string, body: unknown, key: string): Promise<T> {
 
 export const startParameters: StartRun = {
   mode: 'live',
+  workflow_version: 'clinic-v3', test_scenario: 'standard',
   limits: {
     max_parallel_tasks: 2, max_repair_iterations: 2, max_llm_calls: 64,
     max_tokens: null, max_cost_usd: null, max_duration_seconds: 1800,
@@ -72,7 +73,7 @@ export const api = {
   projects: (signal?: AbortSignal) => request<ProjectView[]>('/api/projects', { signal }),
   createProject: (input: CreateProject, key: string) => post<ProjectView>('/api/projects', input, key),
   runs: (projectId: string, signal?: AbortSignal) => request<RunView[]>(`/api/projects/${encodeURIComponent(projectId)}/runs`, { signal }),
-  start: (projectId: string, key: string, mode: StartRun['mode'] = 'live') => post<RunView>(`/api/projects/${encodeURIComponent(projectId)}/runs`, { ...startParameters, mode }, key),
+  start: (projectId: string, key: string, mode: StartRun['mode'] = 'live', testScenario: StartRun['test_scenario'] = 'standard') => post<RunView>(`/api/projects/${encodeURIComponent(projectId)}/runs`, { ...startParameters, mode, test_scenario: mode === 'test' ? testScenario : 'standard' }, key),
   snapshot: (runId: string, signal?: AbortSignal) => request<Snapshot>(`/api/runs/${encodeURIComponent(runId)}/snapshot`, { signal }),
   candidate: (runId: string, signal?: AbortSignal) => request<CandidateView | null>(`/api/runs/${encodeURIComponent(runId)}/candidate`, { signal }),
   tools: (runId: string, signal?: AbortSignal) => request<ToolRunView[]>(`/api/runs/${encodeURIComponent(runId)}/tools`, { signal }),

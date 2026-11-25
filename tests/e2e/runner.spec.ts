@@ -32,7 +32,7 @@ async function createReadyCandidate(request: APIRequestContext) {
   expect(created.status()).toBe(201);
   const project: ProjectView = await created.json();
   const started = await request.post(`/api/projects/${project.id}/runs`, {
-    headers: { ...headers, 'Idempotency-Key': randomUUID() }, data: { mode: 'test' },
+    headers: { ...headers, 'Idempotency-Key': randomUUID() }, data: { mode: 'test', workflow_version: 'clinic-v2' },
   });
   expect(started.status()).toBe(201);
   const run: RunView = await started.json();

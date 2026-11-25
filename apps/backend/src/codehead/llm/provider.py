@@ -18,6 +18,8 @@ class ProviderRequest:
     profile_version: str | None = None
     profile_hash: str | None = None
     acceptance_suite_hash: str | None = None
+    quality_context: dict | None = None
+    repair_context: dict | None = None
 
 
 @dataclass(frozen=True)

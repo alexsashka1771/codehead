@@ -1,6 +1,7 @@
 """Queue and fence trusted checks in short locked Run transactions."""
 
 import json
+import math
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -13,7 +14,7 @@ from codehead.contracts import CandidateView, RunView, ToolCommand, ToolRunView
 from codehead.errors import DomainError
 from codehead.llm.redaction import redact
 from codehead.persistence.candidates import candidate_view
-from codehead.persistence.models import Artifact, Decision, Run, ToolRun
+from codehead.persistence.models import Artifact, Decision, QualityCycle, Run, ToolRun
 from codehead.workflow.publication import PublicationTransactions
 
 SUPPORTED_TOOLS = ("validate_backend", "test_backend", "build_frontend")
@@ -32,6 +33,24 @@ class ToolLease:
 
 
 class ToolTransactions:
+    def _quality_tool_remaining(self, run, tool):
+        if tool.qa_cycle_id is None:
+            return None
+        return run.limits["max_duration_seconds"] - (self.clock() - run.created_at).total_seconds()
+
+    def _expire_quality_tool(self, session, run, tool, owner):
+        cycle = session.get(QualityCycle, tool.qa_cycle_id)
+        self._quality_block(
+            session, run, cycle, "Исчерпан лимит времени запуска во время автоматического QA."
+        )
+        if tool.status == "created":
+            tool.status, tool.finished_at = "cancelled", self.clock()
+            tool.error_code, tool.error_message = "run_duration_exceeded", run.blocked_reason
+            tool.fencing_token += 1
+            tool.lease_owner, tool.lease_expires_at = None, None
+            self._quality_tool_finished(session, run, tool)
+        self._emit_workflow(session, run, "budget.exceeded", actor_id=owner)
+
     @staticmethod
     def _tools(session, run_id):
         return list(
@@ -80,7 +99,7 @@ class ToolTransactions:
                 )
             if (
                 run.mode != "test"
-                or run.workflow_version != "clinic-v2"
+                or run.workflow_version not in {"clinic-v2", "clinic-v3"}
                 or run.status not in {"running", "blocked"}
                 or run.cancel_requested
                 or run.pause_requested
@@ -198,7 +217,7 @@ class ToolTransactions:
                 select(Run)
                 .where(
                     Run.mode == "test",
-                    Run.workflow_version == "clinic-v2",
+                    Run.workflow_version.in_(["clinic-v2", "clinic-v3"]),
                     Run.status.in_(["running", "blocked"]),
                     Run.pause_requested.is_(False),
                     Run.cancel_requested.is_(False),
@@ -224,11 +243,25 @@ class ToolTransactions:
             if occupied >= run.limits["max_parallel_tasks"]:
                 return None
             pending = [
-                tool for tool in tools if tool.status == "created" and tool.lease_owner is None
+                tool
+                for tool in tools
+                if tool.status == "created"
+                and tool.lease_owner is None
+                and (
+                    tool.qa_cycle_id is None
+                    or session.get(QualityCycle, tool.qa_cycle_id).status
+                    not in {"blocked", "cancelled"}
+                )
             ]
             if not pending:
                 return None
             tool = pending[0]
+            remaining = self._quality_tool_remaining(run, tool)
+            if remaining is not None:
+                if remaining < 1:
+                    self._expire_quality_tool(session, run, tool, owner)
+                    return None
+                tool.timeout_seconds = min(tool.timeout_seconds, math.floor(remaining))
             try:
                 view = candidate_view(session, run.id)
                 if not self._candidate_pins(run, view, tool):
@@ -237,6 +270,8 @@ class ToolTransactions:
             except InvalidFile as failure:
                 tool.status, tool.finished_at = "failed", self.clock()
                 tool.error_code, tool.error_message = "input_version_conflict", str(failure)
+                if hasattr(self, "_quality_tool_finished"):
+                    self._quality_tool_finished(session, run, tool)
                 self._emit_workflow(session, run, "tool.failed", actor_id=owner)
                 return None
             tool.fencing_token += 1
@@ -270,7 +305,7 @@ class ToolTransactions:
             and tool.lease_expires_at is not None
             and tool.lease_expires_at > self.clock()
             and run.mode == "test"
-            and run.workflow_version == "clinic-v2"
+            and run.workflow_version in {"clinic-v2", "clinic-v3"}
             and run.status in {"running", "blocked", "pausing"}
             and self._candidate_pins(run, candidate, tool)
             and self._candidate_pins(run, candidate, lease.tool)
@@ -296,7 +331,26 @@ class ToolTransactions:
             if run.status not in {"running", "blocked"}:
                 return False
             tool = self._tool_current(session, run, lease, status="created")
+            remaining = self._quality_tool_remaining(run, tool)
+            if remaining is not None and remaining < 1:
+                self._expire_quality_tool(session, run, tool, lease.owner)
+                return False
+            if tool.qa_cycle_id is not None and session.get(
+                QualityCycle, tool.qa_cycle_id
+            ).status in {"blocked", "cancelled"}:
+                tool.status, tool.finished_at = "cancelled", self.clock()
+                tool.error_code, tool.error_message = (
+                    "quality_blocked_before_dispatch",
+                    "Цикл QA заблокирован до dispatch проверки.",
+                )
+                tool.fencing_token += 1
+                tool.lease_owner, tool.lease_expires_at = None, None
+                self._quality_tool_finished(session, run, tool)
+                self._emit_workflow(session, run, "tool.cancelled", actor_id=lease.owner)
+                return False
             tool.status, tool.started_at = "running", self.clock()
+            if hasattr(self, "_quality_tool_started"):
+                self._quality_tool_started(session, run, tool)
             self._emit_workflow(session, run, "tool.started", actor_id=lease.owner)
             return True
 
@@ -312,7 +366,18 @@ class ToolTransactions:
         with self.database.read() as session:
             run = self._run(session, lease.run_id)
             tool = self._tool_current(session, run, lease)
-            return bool(run.pause_requested or run.cancel_requested or tool.status != "running")
+            cycle_blocked = tool.qa_cycle_id is not None and session.get(
+                QualityCycle, tool.qa_cycle_id
+            ).status in {"blocked", "cancelled"}
+            remaining = self._quality_tool_remaining(run, tool)
+            return bool(
+                run.pause_requested
+                or run.cancel_requested
+                or tool.status != "running"
+                or cycle_blocked
+                or remaining is not None
+                and remaining <= 0
+            )
 
     def finish_tool(self, lease, result):
         with self.database.sessions.begin() as session:
@@ -348,6 +413,11 @@ class ToolTransactions:
                 else None
             )
             tool.lease_owner, tool.lease_expires_at = None, None
+            remaining = self._quality_tool_remaining(run, tool)
+            if remaining is not None and remaining <= 0 and not run.cancel_requested:
+                self._expire_quality_tool(session, run, tool, lease.owner)
+            if hasattr(self, "_quality_tool_finished"):
+                self._quality_tool_finished(session, run, tool)
             self._settle_control(session, run)
             self._emit_workflow(session, run, f"tool.{tool.status}", actor_id=lease.owner)
             return ToolRunView.model_validate(tool)
@@ -374,6 +444,8 @@ class ToolTransactions:
             )
             if sent:
                 self._tool_uncertain_decision(session, run, tool)
+            if hasattr(self, "_quality_tool_finished"):
+                self._quality_tool_finished(session, run, tool)
             self._settle_control(session, run)
             self._emit_workflow(session, run, "tool.uncertain" if sent else "tool.cancelled")
             recovered += 1
@@ -421,6 +493,8 @@ class ToolTransactions:
             tool.fencing_token += 1
             tool.lease_owner, tool.lease_expires_at = None, None
             self._tool_uncertain_decision(session, run, tool)
+            if hasattr(self, "_quality_tool_finished"):
+                self._quality_tool_finished(session, run, tool)
             self._settle_control(session, run)
             self._emit_workflow(session, run, "tool.uncertain", actor_id=lease.owner)
 

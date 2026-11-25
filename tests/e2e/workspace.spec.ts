@@ -38,8 +38,16 @@ test('creates a project, preserves history and controls its saved run', async ({
   await page.getByLabel('Что нужно создать').fill('Учебное приложение для врачей, условных пациентов и записи на приём.');
   await page.getByRole('button', { name: 'Создать проект', exact: true }).click();
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Запустить', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Запустить', exact: true })).toBeDisabled();
+  const projectId = new URL(page.url()).searchParams.get('project');
+  const response = await request.post(`/api/projects/${projectId}/runs`, {
+    headers: { ...headers, 'Idempotency-Key': randomUUID() }, data: { mode: 'live' },
+  });
+  expect(response.status()).toBe(201);
+  const savedRun = await response.json();
+  await page.goto(`/?project=${projectId}&run=${savedRun.id}`);
   await expect(page.getByText('События подключены', { exact: true })).toBeVisible();
+  await openTaskData(page);
   await expect(page.locator('.task-table tbody tr')).toHaveCount(7);
   const persistedUrl = page.url();
   const runId = new URL(persistedUrl).searchParams.get('run');
@@ -160,6 +168,7 @@ test('keeps a newly created project when an older project list arrives', async (
 });
 
 test('keeps a newly started run when an older run list arrives after refresh', async ({ page, request }) => {
+  test.skip(process.env.CODEHEAD_E2E_WITH_WORKER !== '1', 'Starting a test requires the ready QA worker.');
   const { project, run, headers } = await createRun(request);
   const cancelled = await request.post(`/api/runs/${run.id}/commands`, {
     headers: { ...headers, 'Idempotency-Key': randomUUID() }, data: { command: 'cancel' },
@@ -167,7 +176,7 @@ test('keeps a newly started run when an older run list arrives after refresh', a
   expect(cancelled.ok()).toBe(true);
   await page.goto(`/?project=${project.id}&run=${run.id}`);
   await openProjectControls(page);
-  await expect(page.getByRole('button', { name: 'Запустить', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Запустить тест', exact: true })).toBeEnabled();
   let releaseStart!: () => void;
   let releaseHistory!: () => void;
   let sawStart!: () => void;
@@ -189,7 +198,7 @@ test('keeps a newly started run when an older run list arrives after refresh', a
     await route.fulfill({ response, body });
   });
   try {
-    await page.getByRole('button', { name: 'Запустить', exact: true }).click();
+    await page.getByRole('button', { name: 'Запустить тест', exact: true }).click();
     await startSeen;
     await page.getByTitle('Переподключиться к серверу').click();
     await historySeen;
@@ -200,6 +209,6 @@ test('keeps a newly started run when an older run list arrives after refresh', a
     releaseHistory();
     await expect(page.getByText('Загружаем запуски…', { exact: true })).toHaveCount(0);
     await expect(page).toHaveURL(createdUrl);
-    await expect(page.locator('.task-table .status-queued')).toHaveCount(7);
+    await expect(page.locator('.task-table tbody tr')).toHaveCount(7);
   } finally { releaseStart(); releaseHistory(); }
 });

@@ -116,7 +116,12 @@ def _prepare(service, report):
         ),
         "clinic-check-project",
     )
-    run = service.start_run(project.id, StartRun(mode="test"), "clinic-check-start", "clinic-check")
+    run = service.start_run(
+        project.id,
+        StartRun(mode="test", workflow_version="clinic-v2"),
+        "clinic-check-start",
+        "clinic-check",
+    )
     workers = [Worker(service, owner=f"clinic-check-slot-{index}") for index in range(2)]
     try:
         for _ in range(3):

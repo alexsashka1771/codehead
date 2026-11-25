@@ -186,7 +186,90 @@ class CandidateStore:
         )
         return tuple(artifact_ids)
 
-    def _manifest(self, session, run, candidate, *, task=None, attempt=None, input_versions=None):
+    def inject_test_file(self, session, run, fixture):
+        candidate = self.ensure(session, run)
+        if candidate.status != "ready" or fixture.relative_path != "backend/clinic_storage.py":
+            raise InvalidFile("Инъекция требует готовый кандидат и доверенную область storage.")
+        current = {file["relative_path"]: file for file in candidate.files}
+        parent = current[fixture.relative_path]
+        content = validate_text(fixture.content)
+        if (
+            text_hash(content) != fixture.content_hash
+            or len(content.encode("utf-8")) > run.limits["max_file_bytes"]
+        ):
+            raise InvalidFile("Доверенная fixture не соответствует хэшу или лимиту.")
+        before = {
+            "revision": candidate.revision,
+            "tree_hash": candidate.tree_hash,
+            "manifest_artifact_id": candidate.manifest_artifact_id,
+            "manifest_hash": session.get(Artifact, candidate.manifest_artifact_id).content_hash,
+            "storage_hash": parent["content_hash"],
+        }
+        artifact = Artifact(
+            id=str(uuid4()),
+            run_id=run.id,
+            task_id=None,
+            artifact_type="source_code",
+            version=parent["version"] + 1,
+            content_hash=fixture.content_hash,
+            relative_path=fixture.relative_path,
+            author_role=None,
+            input_versions={parent["artifact_id"]: parent["version"]},
+            created_at=self.clock(),
+            provenance={
+                "origin": "test",
+                "producer_id": None,
+                "parent_artifact_id": parent["artifact_id"],
+            },
+            media_type=parent["media_type"],
+            byte_size=len(content.encode("utf-8")),
+            content_text=content,
+        )
+        session.add(artifact)
+        current[fixture.relative_path] = CandidateFileView(
+            relative_path=fixture.relative_path,
+            artifact_id=artifact.id,
+            version=artifact.version,
+            content_hash=artifact.content_hash,
+            media_type=artifact.media_type,
+            byte_size=artifact.byte_size,
+            origin="test_injected",
+            source="test",
+            producer_id=None,
+            producer_role=None,
+            parent_artifact_id=parent["artifact_id"],
+            parent_hash=parent["content_hash"],
+            input_versions=artifact.input_versions,
+        ).model_dump(mode="json")
+        candidate.files = sorted(current.values(), key=lambda file: file["relative_path"])
+        candidate.tree_hash = tree_hash(
+            {path: file["content_hash"] for path, file in current.items()}
+        )
+        candidate.revision += 1
+        candidate.status, candidate.workspace_path = "materializing", None
+        candidate.updated_at = self.clock()
+        self._manifest(
+            session, run, candidate, input_versions=artifact.input_versions, system_test=True
+        )
+        return before, {
+            "revision": candidate.revision,
+            "tree_hash": candidate.tree_hash,
+            "manifest_artifact_id": candidate.manifest_artifact_id,
+            "manifest_hash": session.get(Artifact, candidate.manifest_artifact_id).content_hash,
+            "storage_hash": artifact.content_hash,
+        }
+
+    def _manifest(
+        self,
+        session,
+        run,
+        candidate,
+        *,
+        task=None,
+        attempt=None,
+        input_versions=None,
+        system_test=False,
+    ):
         parent = candidate.manifest_artifact_id if candidate.revision > 1 else None
         content = (
             json.dumps(
@@ -220,7 +303,9 @@ class CandidateStore:
             input_versions=dict(input_versions or {}),
             created_at=self.clock(),
             provenance={
-                "origin": "test" if attempt and attempt.provider == "test" else "template",
+                "origin": "test"
+                if system_test or attempt and attempt.provider == "test"
+                else "template",
                 "producer_id": attempt.id if attempt else None,
                 "parent_artifact_id": parent,
             },

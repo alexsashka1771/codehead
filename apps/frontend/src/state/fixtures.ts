@@ -6,6 +6,7 @@ export const testRun: RunView = {
   created_at: '2026-11-14T10:00:00Z', started_at: null, finished_at: null, blocked_reason: null,
   cancel_requested: false,
   pause_requested: false,
+  test_scenario: 'standard', injection_done: false,
   profile_version: null, profile_hash: null, acceptance_suite_hash: null, template_hash: null,
 };
 
@@ -14,7 +15,7 @@ export function makeSnapshot(): Snapshot {
     schema_version: 1,
     project: { id: 'project-one', name: 'Clinic Demo', description: 'Test project', requirements_version: 1, created_at: testRun.created_at, profile: 'clinic_demo' },
     run: { ...testRun, limits: { ...testRun.limits } }, tasks: [], agents: [], artifacts: [], last_event_seq: 0,
-    agent_runs: [], decisions: [], usage: null, candidate: null, tool_runs: [],
+    agent_runs: [], decisions: [], usage: null, candidate: null, tool_runs: [], quality_cycles: [],
   };
 }
 

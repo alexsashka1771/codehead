@@ -227,7 +227,8 @@ def test_capability_requires_all_registered_tools_and_unions_worker_support(clie
             )
         )
     assert capability()["status"] == "available"
-    assert "QA" in capability()["reason"] and "preview" in capability()["reason"]
+    assert "process_only" in capability()["reason"]
+    assert "preview" in capability()["reason"].lower()
 
 
 def test_queue_rejects_run_without_candidate(database):

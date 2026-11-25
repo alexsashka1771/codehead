@@ -199,9 +199,23 @@ class TestProvider:
     def _clean_request(self, request: ProviderRequest) -> ProviderRequest:
         if not isinstance(request, ProviderRequest):
             raise self._failure("invalid_provider_request", "Expected a ProviderRequest.")
+        if request.quality_context is not None and request.role != "qa":
+            raise self._failure("invalid_provider_request", "QA evidence belongs to the QA role.")
+        if request.repair_context is not None and (
+            request.role != "backend"
+            or not isinstance(request.repair_context, dict)
+            or request.repair_context.get("test_scenario")
+            not in {"standard", "repair_success", "repair_blocked"}
+            or type(request.repair_context.get("iteration")) is not int
+            or request.repair_context["iteration"] not in {1, 2}
+        ):
+            raise self._failure("invalid_provider_request", "Invalid pinned repair context.")
         if not isinstance(request.role, str) or (
             request.role not in _REQUIRED_INPUTS
             and not (self.with_files and request.role in ROLE_PATHS)
+            and not (
+                self.with_files and request.role == "qa" and request.quality_context is not None
+            )
         ):
             raise self._failure(
                 "unsupported_role", "The test provider does not support the requested role."
@@ -255,9 +269,15 @@ class TestProvider:
             profile_version=request.profile_version,
             profile_hash=request.profile_hash,
             acceptance_suite_hash=request.acceptance_suite_hash,
+            quality_context=request.quality_context,
+            repair_context=request.repair_context,
         )
         if clean.role in ROLE_PATHS:
             clean = replace(clean, candidate_files=clean_file_bases(clean))
+        if clean.role == "qa":
+            from codehead.llm.quality_provider import evidence_status
+
+            evidence_status(clean.quality_context)
         return clean
 
     def _prompt(self, request: ProviderRequest) -> str:
@@ -270,7 +290,9 @@ class TestProvider:
             "provider": self.name,
             "model": self.model,
             "mode": "test",
-            "instructions_version": "clinic-files-v1"
+            "instructions_version": "worker-test-qa-v1"
+            if request.role == "qa"
+            else "clinic-files-v1"
             if request.role in ROLE_PATHS
             else "clinic-document-v1",
             "instruction": (
@@ -293,6 +315,10 @@ class TestProvider:
         if clean.role in ROLE_PATHS:
             files, summary = propose_files(clean, self.secrets)
             artifacts = ()
+        elif clean.role == "qa":
+            from codehead.llm.quality_provider import drafts
+
+            artifacts, summary = drafts(clean.quality_context)
         else:
             artifacts, summary = _DOCUMENT_FACTORIES[clean.role](clean)
         artifacts = tuple(

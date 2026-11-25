@@ -65,13 +65,17 @@ def database_status(request: Request) -> str:
     return "ready"
 
 
-def worker_ready(request: Request, *, required_roles=(), required_tools=()) -> bool:
+def worker_ready(
+    request: Request, *, required_roles=(), required_tools=(), require_single=False
+) -> bool:
     service = request.app.state.service
     if service is None:
         return False
     try:
         return service.worker_connected(
-            required_roles=required_roles, required_tools=required_tools
+            required_roles=required_roles,
+            required_tools=required_tools,
+            require_single=require_single,
         )
     except OperationalError:
         return False
@@ -102,6 +106,12 @@ def capabilities(request: Request):
     )
     engineers = ready and worker_ready(request, required_roles=("backend", "frontend"))
     runner = ready and worker_ready(request, required_tools=SUPPORTED_TOOLS)
+    quality = ready and worker_ready(
+        request,
+        required_roles=("product_manager", "architect", "cto", "backend", "frontend", "qa"),
+        required_tools=SUPPORTED_TOOLS,
+        require_single=True,
+    )
     return CapabilitiesResponse(
         stage="worker" if connected else "foundation",
         roles=list(ROLE_DEFINITIONS),
@@ -138,8 +148,13 @@ def capabilities(request: Request):
             ),
             Capability(
                 id="qa_execution",
-                status="planned",
-                reason="QA и DevOps ещё не исполняются worker; готовый кандидат ждёт этого этапа.",
+                status="available" if quality else "disabled",
+                reason=(
+                    "Clinic v3 после пяти test-ролей выполняет три проверки, QA и до двух repair. "
+                    "DevOps/preview ещё не подключены."
+                )
+                if quality
+                else "Для QA нужен worker с шестью test-ролями и тремя инструментами.",
             ),
             Capability(
                 id="preview",
@@ -156,12 +171,12 @@ def capabilities(request: Request):
                 status="available" if runner else "disabled",
                 reason=(
                     "Ручные validate_backend, test_backend и build_frontend "
-                    "для тестового кандидата; process_only. QA и preview ещё не подключены."
+                    "для тестового кандидата; process_only. Preview ещё не подключён."
                 )
                 if runner
                 else (
                     "Worker с validate_backend, test_backend и build_frontend не подключён; "
-                    "QA и preview ещё не подключены."
+                    "preview ещё не подключён."
                 ),
             ),
             Capability(

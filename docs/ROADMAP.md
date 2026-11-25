@@ -1,6 +1,6 @@
 # CodeHead — дорожная карта
 
-План следует [R01–R16](TECHNICAL_SPEC.md); критерии определены только в ТЗ. Даты — ориентиры, выполнение подтверждается отчётами. Текущий этап — [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md), Runner — [RUNNER_REPORT](RUNNER_REPORT.md), кандидат — [CLINIC_REPORT](CLINIC_REPORT.md), worker — [WORKER_REPORT](WORKER_REPORT.md), история foundation — [STAGE_01_REPORT](STAGE_01_REPORT.md).
+План следует [R01–R16](TECHNICAL_SPEC.md); критерии определены только в ТЗ. Даты — ориентиры, выполнение подтверждается отчётами. Текущий этап — [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md), QA/repair — [QA_REPORT](QA_REPORT.md), Runner — [RUNNER_REPORT](RUNNER_REPORT.md), кандидат — [CLINIC_REPORT](CLINIC_REPORT.md), worker — [WORKER_REPORT](WORKER_REPORT.md), история foundation — [STAGE_01_REPORT](STAGE_01_REPORT.md).
 
 ## Курсовая: семь сессий
 
@@ -18,14 +18,13 @@
 
 В сессиях 2–4 резервировать 60–90 минут на соответствующую интерфейсную контрольную точку и 30 минут на проверку; остаток — backend. В сессии 5 основное время отдано взаимодействиям и визуализации. Если UI-контрольная точка пропущена, это явный незакрытый результат сессии.
 
-## Ближайшая сессия после Runner 4.1
+## Ближайший подэтап 4.3 после QA/repair
 
-1. Подключить QA к уже работающему ToolRun/RestrictedProcessRunner и сохранять карту проверки/разбор фактического отчёта; ручные Python/HTTP/build проверки уже доступны.
-2. Подключить внешний закреплённый HTTP-suite к QA и сохранить TestReport/Bug с хэшами кандидата/профиля/suite.
-3. Проверить настоящий red/green и две неудачные repair-попытки на отдельно помеченных defect fixtures; обычный кандидат дефект не содержит.
-4. Подключить DevOps, сборку и preview на отдельном origin с версией и фактическим health-check.
-5. Показать результаты проверок, блокировки и preview в существующем интерфейсе, расширить projection/recovery проверки.
-6. Реальный адаптер и live остаются отдельным этапом с согласованными provider/model/token/cost параметрами; test_injected не считается генерацией LLM.
+1. Использовать проверенную границу QA/repair 4.2 по QA_REPORT: настоящий standard, red→green и initial+две red подтверждены внешним suite.
+2. После зелёного QA подключить отдельную DevOps-попытку к закреплённой сборке, сохранив её содержательные входы и результат.
+3. Запустить preview Clinic Demo на отдельном origin с версиями и фактическим health-check; ограничения Runner/процессов остаются явными.
+4. Показать сохранённые состояния preview, ошибки запуска и связь с проверенной ревизией; расширить projection/recovery проверки.
+5. Реальный адаптер и live остаются отдельным этапом с согласованными provider/model/token/cost параметрами; test_injected не считается генерацией LLM.
 
 ## Диплом: визуальная работа с ранней развилкой
 

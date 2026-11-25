@@ -19,6 +19,7 @@ export function makeToolSnapshot(status: ToolRunView['status'] = 'succeeded') {
     created_at: '2026-11-24T10:00:01.123456Z', started_at: '2026-11-24T10:00:02Z',
     finished_at: ['succeeded', 'failed', 'cancelled', 'timed_out'].includes(status) ? '2026-11-24T10:00:03Z' : null,
     fencing_token: 1, lease_owner: null, lease_expires_at: null,
+    qa_cycle_id: null,
   };
   snapshot.tool_runs = [tool];
   return snapshot;
