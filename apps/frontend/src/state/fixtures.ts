@@ -15,7 +15,7 @@ export function makeSnapshot(): Snapshot {
     schema_version: 1,
     project: { id: 'project-one', name: 'Clinic Demo', description: 'Test project', requirements_version: 1, created_at: testRun.created_at, profile: 'clinic_demo' },
     run: { ...testRun, limits: { ...testRun.limits } }, tasks: [], agents: [], artifacts: [], last_event_seq: 0,
-    agent_runs: [], decisions: [], usage: null, candidate: null, tool_runs: [], quality_cycles: [],
+    agent_runs: [], decisions: [], usage: null, candidate: null, tool_runs: [], quality_cycles: [], delivery: null, preview_sessions: [],
   };
 }
 

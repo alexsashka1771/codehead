@@ -1,6 +1,7 @@
 import type { CapabilitiesResponse, Snapshot, ToolCommand, ToolRunView } from '../../../../packages/contracts';
 import { formatTime } from './roles';
 import { ArtifactText } from './WorkerDetails';
+import { hasCandidateWorkflow } from '../state/workflowVersions';
 
 export type QueueTool = (command: ToolCommand) => Promise<boolean>;
 const operations: { id: ToolCommand['operation_id']; label: string; result: string }[] = [
@@ -11,6 +12,9 @@ const operations: { id: ToolCommand['operation_id']; label: string; result: stri
 const statusLabels: Record<ToolRunView['status'], string> = {
   created: 'В очереди', running: 'Выполняется', succeeded: 'Успешно', failed: 'Ошибка', cancelled: 'Отменено', uncertain: 'Исход неизвестен', timed_out: 'Таймаут',
 };
+const runtimeLabels: Partial<Record<ToolRunView['operation_id'], string>> = {
+  smoke_test: 'Smoke-проверка пакета', start_preview: 'Запуск preview', stop_preview: 'Остановка preview',
+};
 export function ToolRunsPanel({ snapshot, capabilities, connected, pending, onQueue, onSelectArtifact, onSelectDecision, awaitingToolEvent = false, selectedId = null, onSelectAll }: {
   snapshot: Snapshot | null; capabilities: CapabilitiesResponse | null; connected: boolean; pending: boolean;
   onQueue: QueueTool; onSelectArtifact: (id: string) => void; onSelectDecision: (id: string) => void;
@@ -19,11 +23,12 @@ export function ToolRunsPanel({ snapshot, capabilities, connected, pending, onQu
 }) {
   const candidate = snapshot?.candidate;
   const tools = snapshot?.tool_runs ?? [];
+  const version = snapshot?.run.workflow_version;
   const runner = capabilities?.capabilities.find(capability => capability.id === 'runner');
   const active = tools.some(tool => ['created', 'running', 'uncertain'].includes(tool.status));
   const reason = !snapshot ? 'Выберите запуск, чтобы проверить сохранённого кандидата.'
     : !connected ? 'Для проверки восстановите соединение с сервером.'
-    : !['clinic-v2', 'clinic-v3'].includes(snapshot.run.workflow_version) ? 'Запуск clinic-v1 не создаёт исходный код кандидата для Runner.'
+    : !hasCandidateWorkflow(version) ? `Запуск ${version} не создаёт исходный код кандидата для Runner.`
     : snapshot.run.mode !== 'test' ? 'На этом этапе Runner доступен для просматриваемого тестового кандидата. Live-генерация пока недоступна.'
     : snapshot.run.cancel_requested || snapshot.run.status === 'cancelled' ? 'Запрошена отмена. Новые проверки недоступны.'
     : snapshot.run.pause_requested || ['paused', 'pausing'].includes(snapshot.run.status) ? 'Запрошена пауза. Возобновите запуск перед новой проверкой.'
@@ -35,7 +40,10 @@ export function ToolRunsPanel({ snapshot, capabilities, connected, pending, onQu
   const disabled = pending || reason !== null;
   return <section className="tool-panel" aria-label="Проверки кандидата" data-candidate-revision={candidate?.revision}>
     <div className="decision-heading"><h3>Проверки кандидата{candidate ? ' · версия ' + candidate.revision : ''}</h3></div>
-    <p className="field-hint">Runner выполняет реальные локальные процессы. {snapshot?.run.workflow_version === 'clinic-v3' ? 'История автоматических циклов и отчёты доступны во вкладке QA. DevOps и preview пока недоступны.' : 'QA, DevOps и preview пока недоступны.'}</p>
+    <p className="field-hint">Runner выполняет реальные локальные процессы. {version === 'clinic-v4'
+      ? 'Циклы и отчёты доступны во вкладке QA. Пакет, smoke и управление сессией доступны во вкладке Preview.'
+      : version === 'clinic-v3' ? 'История автоматических циклов и отчёты доступны во вкладке QA. DevOps и preview пока недоступны.'
+        : 'QA, DevOps и preview пока недоступны.'}</p>
     <p className="tool-isolation">Изоляция process_only: Python, pytest и npm исполняют код с доступом к файлам и сети локального пользователя. Используйте проверенный учебный код и синтетические данные.</p>
     <div className="tool-actions">{operations.map(operation => <button type="button" key={operation.id} className="button secondary" disabled={disabled}
       onClick={() => { if (!disabled && candidate) void onQueue({ operation_id: operation.id, workspace_id: candidate.id,
@@ -46,7 +54,7 @@ export function ToolRunsPanel({ snapshot, capabilities, connected, pending, onQu
     {tools.length ? <ol className="tool-list">{tools.filter(tool => !selectedId || tool.id === selectedId).sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at) || right.id.localeCompare(left.id)).map(tool => {
       const decision = snapshot?.decisions?.find(item => item.tool_run_id === tool.id && item.status === 'open');
       return <li className="tool-entry" key={tool.id} data-tool-id={tool.id} data-tool-status={tool.status}>
-        <div className="attempt-heading"><h4>{operations.find(operation => operation.id === tool.operation_id)?.result ?? tool.operation_id} · v{tool.snapshot_version}</h4>
+        <div className="attempt-heading"><h4>{operations.find(operation => operation.id === tool.operation_id)?.result ?? runtimeLabels[tool.operation_id]} · v{tool.snapshot_version}</h4>
           <span className={'task-status status-' + tool.status}>{statusLabels[tool.status]}</span></div>
         {tool.qa_cycle_id ? <p className="field-hint">Цикл QA · итерация {snapshot?.quality_cycles?.find(cycle => cycle.id === tool.qa_cycle_id)?.iteration ?? 'неизвестна'}</p> : null}
         {candidate && tool.snapshot_version !== candidate.revision ? <p className="field-hint">Исторический результат версии {tool.snapshot_version}; текущий кандидат — v{candidate.revision}.</p> : null}

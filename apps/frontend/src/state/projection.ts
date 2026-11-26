@@ -1,11 +1,9 @@
 import type { DomainEvent, Snapshot, TaskView } from '../../../../packages/contracts';
+import { validateDeliveryProgression, validateDeliveryProjection } from './deliveryProjection';
+import { ProjectionError } from './projectionError';
+import { normalizeTimestamp } from './projectionTimestamp';
 
-export class ProjectionError extends Error {
-  constructor(public readonly code: 'event_gap' | 'foreign_run' | 'unsupported_schema' | 'unsupported_event' | 'invalid_event' | 'invalid_history' | 'invalid_timestamp') {
-    super(code);
-    this.name = 'ProjectionError';
-  }
-}
+export { ProjectionError } from './projectionError';
 
 export function applyEvent(snapshot: Snapshot, event: DomainEvent): Snapshot {
   if (snapshot.schema_version !== 1 || event.schema_version !== 1) {
@@ -42,13 +40,21 @@ export function applyEvent(snapshot: Snapshot, event: DomainEvent): Snapshot {
       return hydrateSnapshot({ ...snapshot, ...event.payload, run: { ...event.payload.run, ...cursor }, ...cursor });
     case 'workflow.updated': {
       if (event.payload.run.id !== snapshot.run.id) throw new ProjectionError('foreign_run');
-      const { run, tasks, agents, artifacts, agent_runs, decisions, usage, candidate, tool_runs, quality_cycles } = event.payload;
-      return hydrateSnapshot({ ...snapshot, run: { ...run, ...cursor }, tasks, agents, artifacts,
-        agent_runs, decisions, usage, candidate: candidate ?? null, tool_runs: tool_runs ?? [], quality_cycles: quality_cycles ?? [], ...cursor });
+      const next = workflowSnapshot(snapshot, event);
+      validateDeliveryProgression(snapshot, next);
+      return next;
     }
     default:
       throw new ProjectionError('unsupported_event');
   }
+}
+
+function workflowSnapshot(snapshot: Snapshot, event: Extract<DomainEvent, { event_type?: 'workflow.updated' }>) {
+  const { run, tasks, agents, artifacts, agent_runs, decisions, usage, candidate, tool_runs, quality_cycles, delivery, preview_sessions } = event.payload;
+  if ('access' in event.payload || 'preview_access' in event.payload) throw new ProjectionError('invalid_event');
+  return hydrateSnapshot({ schema_version: snapshot.schema_version, project: snapshot.project,
+    run: { ...run, last_event_seq: event.seq }, tasks, agents, artifacts, agent_runs, decisions, usage,
+    candidate, tool_runs, quality_cycles, delivery, preview_sessions, last_event_seq: event.seq });
 }
 
 function validatePayloadScope(snapshot: Snapshot, event: DomainEvent) {
@@ -68,9 +74,9 @@ function validatePayloadScope(snapshot: Snapshot, event: DomainEvent) {
   if ('decisions' in payload) check(payload.decisions);
   if ('tool_runs' in payload && payload.tool_runs) check(payload.tool_runs);
   if ('quality_cycles' in payload && payload.quality_cycles) check(payload.quality_cycles);
-  if ('quality_cycles' in payload || 'tool_runs' in payload || ('decisions' in payload && payload.decisions.some(decision => decision.tool_run_id != null || decision.kind === 'tool_uncertain_outcome'))) {
-    hydrateSnapshot({ ...snapshot, ...payload, tool_runs: 'tool_runs' in payload ? payload.tool_runs ?? snapshot.tool_runs : snapshot.tool_runs,
-      last_event_seq: 'run' in payload ? payload.run.last_event_seq : snapshot.last_event_seq });
+  if (event.event_type === 'workflow.updated') {
+    if (event.seq <= snapshot.last_event_seq) workflowSnapshot(snapshot, event);
+    return;
   }
   if ('candidate' in payload && payload.candidate) {
     check([payload.candidate]);
@@ -89,7 +95,7 @@ export function projectHistory(events: DomainEvent[], expectedLastSeq?: number):
     schema_version: 1, project: first.payload.project,
     run: { ...first.payload.run, last_event_seq: 0 },
     tasks: [], agents: [], artifacts: [], last_event_seq: 0,
-    agent_runs: [], decisions: [], usage: null, candidate: null, tool_runs: [], quality_cycles: [],
+    agent_runs: [], decisions: [], usage: null, candidate: null, tool_runs: [], quality_cycles: [], delivery: null, preview_sessions: [],
   };
   for (const [index, event] of events.entries()) {
     if (index > 0 && event.event_type === 'run.created') throw new ProjectionError('invalid_history');
@@ -122,6 +128,8 @@ export function normalizeSnapshot(snapshot: Snapshot): Snapshot {
   }
   for (const tool of normalized.tool_runs ?? []) {
     tool.created_at = normalizeTimestamp(tool.created_at);
+    tool.delivery_id ??= null;
+    tool.preview_session_id ??= null;
     for (const field of ['started_at', 'finished_at', 'lease_expires_at'] as const) {
       if (tool[field] != null) tool[field] = normalizeTimestamp(tool[field]);
     }
@@ -129,6 +137,17 @@ export function normalizeSnapshot(snapshot: Snapshot): Snapshot {
   for (const cycle of normalized.quality_cycles ?? []) {
     cycle.created_at = normalizeTimestamp(cycle.created_at);
     if (cycle.finished_at != null) cycle.finished_at = normalizeTimestamp(cycle.finished_at);
+  }
+  if (normalized.delivery) {
+    normalized.delivery.created_at = normalizeTimestamp(normalized.delivery.created_at);
+    normalized.delivery.updated_at = normalizeTimestamp(normalized.delivery.updated_at);
+    if (normalized.delivery.finished_at != null) normalized.delivery.finished_at = normalizeTimestamp(normalized.delivery.finished_at);
+  }
+  for (const session of normalized.preview_sessions ?? []) {
+    session.created_at = normalizeTimestamp(session.created_at);
+    session.updated_at = normalizeTimestamp(session.updated_at);
+    if (session.ready_at != null) session.ready_at = normalizeTimestamp(session.ready_at);
+    if (session.finished_at != null) session.finished_at = normalizeTimestamp(session.finished_at);
   }
   if (normalized.candidate) {
     normalized.candidate.created_at = normalizeTimestamp(normalized.candidate.created_at);
@@ -143,6 +162,7 @@ export function normalizeSnapshot(snapshot: Snapshot): Snapshot {
   normalized.decisions?.sort(byId);
   normalized.tool_runs?.sort(byId);
   normalized.quality_cycles?.sort((left, right) => left.iteration - right.iteration);
+  normalized.preview_sessions?.sort((left, right) => left.version - right.version);
   return normalized;
 }
 
@@ -164,6 +184,8 @@ function withCompatibilityDefaults(snapshot: Snapshot): Snapshot {
         max_files_per_proposal: snapshot.run.limits.max_files_per_proposal ?? 4,
         max_proposal_bytes: snapshot.run.limits.max_proposal_bytes ?? 262144 } },
     candidate: snapshot.candidate ?? null,
+    delivery: snapshot.delivery ?? null,
+    preview_sessions: snapshot.preview_sessions ?? [],
     tasks: snapshot.tasks.map(taskDefaults), agent_runs: snapshot.agent_runs ?? [],
     decisions: (snapshot.decisions ?? []).map(decision => ({ ...decision, blocking: decision.blocking ?? true, tool_run_id: decision.tool_run_id ?? null })),
     tool_runs: (snapshot.tool_runs ?? []).map(tool => ({ ...tool, qa_cycle_id: tool.qa_cycle_id ?? null })),
@@ -188,7 +210,7 @@ export function hydrateSnapshot(snapshot: Snapshot): Snapshot {
   const normalized = withCompatibilityDefaults(snapshot);
   if (normalized.candidate && normalized.candidate.run_id !== normalized.run.id) throw new ProjectionError('foreign_run');
   const collections = [normalized.tasks, normalized.agents, normalized.artifacts,
-    normalized.agent_runs ?? [], normalized.decisions ?? [], normalized.tool_runs ?? [], normalized.quality_cycles ?? []];
+    normalized.agent_runs ?? [], normalized.decisions ?? [], normalized.tool_runs ?? [], normalized.quality_cycles ?? [], normalized.preview_sessions ?? []];
   for (const collection of collections) {
     const ids = new Set<string>();
     for (const entity of collection) {
@@ -223,6 +245,7 @@ export function hydrateSnapshot(snapshot: Snapshot): Snapshot {
   validateCandidate(normalized);
   validateTools(normalized);
   validateQuality(normalized);
+  validateDeliveryProjection(normalized);
   return normalized;
 }
 
@@ -329,7 +352,8 @@ function validateTools(snapshot: Snapshot) {
     const candidate = snapshot.candidate;
     const manifest = snapshot.artifacts.find(artifact => artifact.id === tool.manifest_artifact_id);
     if (!candidate || tool.workspace_id !== candidate.id || !manifest || manifest.run_id !== snapshot.run.id) throw new ProjectionError('foreign_run');
-    if (!['created', 'running', 'succeeded', 'failed', 'cancelled', 'uncertain', 'timed_out'].includes(tool.status)
+    if (!['validate_backend', 'test_backend', 'build_frontend', 'smoke_test', 'start_preview', 'stop_preview'].includes(tool.operation_id)
+      || !['created', 'running', 'succeeded', 'failed', 'cancelled', 'uncertain', 'timed_out'].includes(tool.status)
       || !Number.isSafeInteger(tool.snapshot_version) || tool.snapshot_version < 1 || tool.snapshot_version > candidate.revision
       || manifest.artifact_type !== 'candidate_manifest' || manifest.version !== tool.snapshot_version || manifest.content_hash !== tool.manifest_hash
       || ![tool.tree_hash, tool.manifest_hash, tool.profile_hash, tool.acceptance_suite_hash, tool.template_hash].every(hash => /^[a-f0-9]{64}$/.test(hash))) throw new ProjectionError('invalid_event');
@@ -399,14 +423,4 @@ function validateCandidate(snapshot: Snapshot) {
     }
     paths.add(file.relative_path);
   }
-}
-
-function normalizeTimestamp(value: string): string {
-  const match = /^(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$/.exec(value);
-  if (!match) throw new ProjectionError('invalid_timestamp');
-  const [, date, time, fraction = '', offset] = match;
-  const utc = new Date(`${date}T${time}${offset}`);
-  if (Number.isNaN(utc.getTime())) throw new ProjectionError('invalid_timestamp');
-  const fractionalSeconds = fraction.replace(/0+$/, '');
-  return `${utc.toISOString().slice(0, -5)}${fractionalSeconds ? `.${fractionalSeconds}` : ''}Z`;
 }

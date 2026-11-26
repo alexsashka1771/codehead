@@ -34,7 +34,7 @@ SCENARIOS = {
 TERMINAL_TASKS = {"succeeded", "failed", "cancelled"}
 
 
-def settle(service, run, workers, report):
+def settle(service, run, workers, report, *, final_statuses=("blocked",)):
     stopped = threading.Event()
     history = {}
 
@@ -94,7 +94,7 @@ def settle(service, run, workers, report):
                 active |= any(
                     attempt.status in {"created", "running"} for attempt in snapshot.agent_runs
                 )
-                if snapshot.run.status == "blocked" and not active and not approval:
+                if snapshot.run.status in final_statuses and not active and not approval:
                     return snapshot
                 time.sleep(0.1)
             raise TimeoutError("QA did not reach its bounded final checkpoint in 900 seconds.")
@@ -283,7 +283,7 @@ def main():
             )
             run = service.start_run(
                 project.id,
-                StartRun(mode="test", test_scenario=scenario),
+                StartRun(mode="test", workflow_version="clinic-v3", test_scenario=scenario),
                 f"qa-start-{scenario}",
                 "qa-check",
             )

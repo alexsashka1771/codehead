@@ -3,6 +3,7 @@ import type { AgentView, Role, RoleDefinition, Snapshot } from '../../../../pack
 import { Briefcase, CircleDashed, Code2, Layers, MapPin, PanelTop, Play, Search, Server, ShieldCheck, Unplug } from 'lucide-react';
 import { lifecycleLabels, roleDetails, taskLabels, zoneNames } from './roles';
 import { ArtifactBrowser, AttemptList, DecisionCard, InputVersions, type ResolveDecision } from './WorkerDetails';
+import { hasCandidateWorkflow, hasQualityWorkflow } from '../state/workflowVersions';
 
 interface Props { roles: RoleDefinition[]; agents: AgentView[]; selected: Role; onSelect: (role: Role) => void; hasRun: boolean }
 const roleIcons: Record<Role, typeof Briefcase> = {
@@ -48,6 +49,7 @@ export function AgentPanel({ definition, snapshot, active, connected, pending, o
   const visibleArtifacts = [...new Map([...artifacts, ...inputs].map(artifact => [artifact.id, artifact])).values()];
   const decisions = snapshot?.decisions?.filter(decision => decision.task_id != null && taskIds.has(decision.task_id)) ?? [];
   const queued = snapshot?.tasks.filter(item => item.role === definition.role && item.status === 'queued').length ?? 0;
+  const version = snapshot?.run.workflow_version;
   const previewUrl = new URL(window.location.href);
   previewUrl.searchParams.set('view', 'animations');
   previewUrl.searchParams.set('role', definition.role);
@@ -70,7 +72,7 @@ export function AgentPanel({ definition, snapshot, active, connected, pending, o
       <details><summary>Входы задачи</summary><InputVersions versions={task.input_versions} artifacts={snapshot?.artifacts} onSelectArtifact={setSelectedArtifactId} />
         <p className="field-hint">Версия записи {task.record_version} · fencing token {task.fencing_token ?? 0}</p></details>
       {decisions.map(decision => <DecisionCard key={decision.id + ':' + decision.version} decision={decision}
-        sourceEnabled={['clinic-v2', 'clinic-v3'].includes(snapshot?.run.workflow_version ?? '')} qualityEnabled={snapshot?.run.workflow_version === 'clinic-v3'}
+        sourceEnabled={hasCandidateWorkflow(version)} qualityEnabled={hasQualityWorkflow(version)} deliveryEnabled={version === 'clinic-v4'}
         artifacts={snapshot?.artifacts ?? []} pending={pending} connected={connected} onResolve={onResolve} onSelectArtifact={setSelectedArtifactId} />)}
       {attempts.length ? <><h3 className="workflow-subheading">Попытки</h3><AttemptList attempts={attempts} artifacts={snapshot?.artifacts ?? []}
         onSelectArtifact={setSelectedArtifactId} tasks={snapshot?.tasks} active={active} /></> : <p className="field-hint">Попыток выполнения пока нет.</p>}

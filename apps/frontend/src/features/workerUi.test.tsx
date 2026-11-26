@@ -7,6 +7,16 @@ import { makeWorkerSnapshot } from '../state/workerFixtures';
 import { makeCandidateSnapshot } from '../state/candidateFixtures';
 
 describe('worker controls and audit content', () => {
+  it('describes v4 delivery at the approval gate and keeps the Live action disabled', () => {
+    const snapshot = makeWorkerSnapshot(); snapshot.run.workflow_version = 'clinic-v4';
+    const decision = renderToStaticMarkup(<DecisionCard decision={snapshot.decisions![0]} artifacts={snapshot.artifacts}
+      pending={false} connected sourceEnabled qualityEnabled deliveryEnabled onResolve={async () => true} onSelectArtifact={() => {}} />);
+    expect(decision).toContain('DevOps'); expect(decision).toContain('smoke'); expect(decision).toContain('по отдельной команде');
+    const run = renderToStaticMarkup(<RunPanel run={snapshot.run} runs={[snapshot.run]} snapshot={snapshot}
+      loading={false} pending={null} hasProject connected usage={snapshot.usage!} testAvailable
+      onSelectRun={() => {}} onStart={() => {}} onStartTest={() => {}} onCommand={() => {}} />);
+    expect(run).toContain('Доставка'); expect(run).toContain('Сценарий запуска'); expect(run).toMatch(/disabled=""[^>]*>.*?Запустить<\/button>/);
+  });
   it('explains the QA boundary after approving a v3 architecture', () => {
     const snapshot = makeWorkerSnapshot();
     const markup = renderToStaticMarkup(<DecisionCard decision={snapshot.decisions![0]} artifacts={snapshot.artifacts}

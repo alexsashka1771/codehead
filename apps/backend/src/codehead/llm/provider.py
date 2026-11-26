@@ -20,6 +20,7 @@ class ProviderRequest:
     acceptance_suite_hash: str | None = None
     quality_context: dict | None = None
     repair_context: dict | None = None
+    delivery_context: dict | None = None
 
 
 @dataclass(frozen=True)

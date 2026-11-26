@@ -11,6 +11,7 @@ from codehead.contracts import CandidateView
 from codehead.errors import DomainError
 from codehead.persistence.candidates import candidate_view
 from codehead.persistence.models import Artifact, Candidate, Run
+from codehead.workflow.definition import CANDIDATE_WORKFLOW_VERSIONS, QUALITY_WORKFLOW_VERSIONS
 
 NEXT_STAGE_REASON = "Следующий этап Clinic Demo ещё не подключён: QA, DevOps и preview."
 
@@ -53,7 +54,7 @@ class PublicationTransactions:
             run = session.scalar(
                 select(Run)
                 .where(
-                    Run.workflow_version.in_(["clinic-v2", "clinic-v3"]),
+                    Run.workflow_version.in_(CANDIDATE_WORKFLOW_VERSIONS),
                     Run.status == "running",
                     Run.cancel_requested.is_(False),
                     Run.pause_requested.is_(False),
@@ -169,7 +170,7 @@ class PublicationTransactions:
             candidate.publication_owner, candidate.publication_expires_at = None, None
             candidate.updated_at = self.clock()
             self._emit_workflow(session, run, "candidate.ready", actor_id=lease.owner)
-            if run.workflow_version == "clinic-v3":
+            if run.workflow_version in QUALITY_WORKFLOW_VERSIONS:
                 try:
                     self._quality_ready(session, run, candidate)
                 except (InvalidFile, ValueError, OSError) as failure:

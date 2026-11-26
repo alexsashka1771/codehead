@@ -15,6 +15,7 @@ from codehead.errors import DomainError
 from codehead.llm.redaction import redact
 from codehead.persistence.candidates import candidate_view
 from codehead.persistence.models import Artifact, Decision, QualityCycle, Run, ToolRun
+from codehead.workflow.definition import CANDIDATE_WORKFLOW_VERSIONS
 from codehead.workflow.publication import PublicationTransactions
 
 SUPPORTED_TOOLS = ("validate_backend", "test_backend", "build_frontend")
@@ -50,6 +51,21 @@ class ToolTransactions:
             tool.lease_owner, tool.lease_expires_at = None, None
             self._quality_tool_finished(session, run, tool)
         self._emit_workflow(session, run, "budget.exceeded", actor_id=owner)
+
+    def _occupied_slots(self, session, run):
+        return (
+            sum(
+                attempt.status in {"created", "running"}
+                for attempt in self._attempts(session, run.id)
+            )
+            + sum(
+                tool.status == "running"
+                or tool.status == "created"
+                and tool.lease_owner is not None
+                for tool in self._tools(session, run.id)
+            )
+            + int(self._has_active_delivery_publication(session, run.id))
+        )
 
     @staticmethod
     def _tools(session, run_id):
@@ -99,7 +115,7 @@ class ToolTransactions:
                 )
             if (
                 run.mode != "test"
-                or run.workflow_version not in {"clinic-v2", "clinic-v3"}
+                or run.workflow_version not in CANDIDATE_WORKFLOW_VERSIONS
                 or run.status not in {"running", "blocked"}
                 or run.cancel_requested
                 or run.pause_requested
@@ -217,7 +233,7 @@ class ToolTransactions:
                 select(Run)
                 .where(
                     Run.mode == "test",
-                    Run.workflow_version.in_(["clinic-v2", "clinic-v3"]),
+                    Run.workflow_version.in_(CANDIDATE_WORKFLOW_VERSIONS),
                     Run.status.in_(["running", "blocked"]),
                     Run.pause_requested.is_(False),
                     Run.cancel_requested.is_(False),
@@ -230,22 +246,13 @@ class ToolTransactions:
             tools = self._tools(session, run.id)
             if any(tool.status == "uncertain" for tool in tools):
                 return None
-            occupied = sum(
-                attempt.status in {"created", "running"}
-                for attempt in self._attempts(session, run.id)
-            )
-            occupied += sum(
-                tool.status == "running"
-                or tool.status == "created"
-                and tool.lease_owner is not None
-                for tool in tools
-            )
-            if occupied >= run.limits["max_parallel_tasks"]:
+            if self._occupied_slots(session, run) >= run.limits["max_parallel_tasks"]:
                 return None
             pending = [
                 tool
                 for tool in tools
-                if tool.status == "created"
+                if tool.operation_id in SUPPORTED_TOOLS
+                and tool.status == "created"
                 and tool.lease_owner is None
                 and (
                     tool.qa_cycle_id is None
@@ -305,7 +312,7 @@ class ToolTransactions:
             and tool.lease_expires_at is not None
             and tool.lease_expires_at > self.clock()
             and run.mode == "test"
-            and run.workflow_version in {"clinic-v2", "clinic-v3"}
+            and run.workflow_version in CANDIDATE_WORKFLOW_VERSIONS
             and run.status in {"running", "blocked", "pausing"}
             and self._candidate_pins(run, candidate, tool)
             and self._candidate_pins(run, candidate, lease.tool)
@@ -419,7 +426,10 @@ class ToolTransactions:
             if hasattr(self, "_quality_tool_finished"):
                 self._quality_tool_finished(session, run, tool)
             self._settle_control(session, run)
-            self._emit_workflow(session, run, f"tool.{tool.status}", actor_id=lease.owner)
+            action = f"tool.{tool.status}"
+            if self._finish_ready_run(session, run, self._delivery(session, run.id)):
+                action = "run.succeeded"
+            self._emit_workflow(session, run, action, actor_id=lease.owner)
             return ToolRunView.model_validate(tool)
 
     def _recover_tools(self, session, run):
@@ -428,6 +438,12 @@ class ToolTransactions:
             if tool.status not in {"created", "running"} or tool.lease_owner is None:
                 continue
             if tool.lease_expires_at is not None and tool.lease_expires_at > self.clock():
+                continue
+            if tool.operation_id == "smoke_test":
+                self._recover_runtime_smoke(session, run, tool)
+                recovered += 1
+                continue
+            if tool.operation_id not in SUPPORTED_TOOLS:
                 continue
             sent = tool.status == "running"
             tool.fencing_token += 1
@@ -519,7 +535,7 @@ class ToolTransactions:
         tool.error_message = "Пользователь подтвердил остановку или отказ: " + decision.comment
         run.status, run.blocked_reason = (
             "blocked",
-            "Исход проверки уточнён; этап QA и preview ещё не подключён.",
+            "Исход проверки уточнён. Можно отменить запуск и начать заново.",
         )
         self._settle_control(session, run)
         self._emit_workflow(

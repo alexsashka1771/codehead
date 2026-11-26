@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Boxes, ChevronDown, ChevronUp, FileBox, GitBranch, History, List, ListChecks, ScrollText, Terminal, FlaskConical } from 'lucide-react';
+import { Boxes, ChevronDown, ChevronUp, FileBox, GitBranch, History, List, ListChecks, ScrollText, Terminal, FlaskConical, Monitor } from 'lucide-react';
 import type { CapabilitiesResponse, DomainEvent, Snapshot } from '../../../../packages/contracts';
 import { formatTime, roleDetails, taskLabels } from './roles';
 import { ArtifactBrowser, AttemptList, DecisionCard, type ResolveDecision } from './WorkerDetails';
 import { CandidatePanel } from './CandidatePanel';
 import { ToolRunsPanel, type QueueTool } from './ToolRunsPanel';
 import { QualityPanel } from './QualityPanel';
+import { PreviewPanel } from './PreviewPanel';
+import { hasCandidateWorkflow, hasQualityWorkflow } from '../state/workflowVersions';
 export { CandidatePanel } from './CandidatePanel';
 export { ToolRunsPanel } from './ToolRunsPanel';
 
-type Tab = 'tasks' | 'events' | 'candidate' | 'tools' | 'quality' | 'artifacts' | 'attempts' | 'decisions' | 'capabilities';
+type Tab = 'tasks' | 'events' | 'candidate' | 'tools' | 'quality' | 'preview' | 'artifacts' | 'attempts' | 'decisions' | 'capabilities';
 interface Props {
   snapshot: Snapshot | null; events: DomainEvent[]; capabilities: CapabilitiesResponse | null; loading: boolean;
   expanded: boolean; onExpandedChange: (expanded: boolean) => void;
@@ -23,7 +25,7 @@ const eventNames: Record<string, string> = {
   'run.pausing': 'Запрошена пауза', 'run.resumed': 'Запуск возобновлён', 'run.cancelled': 'Запуск отменён',
   'workflow.updated': 'Обновлён процесс',
 };
-const capabilityNames: Record<string, string> = { persistence: 'Сохранение состояния', event_stream: 'Поток событий', worker: 'Исполнение задач', test_execution: 'Тестовое исполнение', first_roles: 'PM → Architect → CTO', live_generation: 'Генерация приложения', replay: 'Воспроизведение запусков', runner: 'Проверки и локальный запуск' };
+const capabilityNames: Record<string, string> = { persistence: 'Сохранение состояния', event_stream: 'Поток событий', worker: 'Исполнение задач', test_execution: 'Тестовое исполнение', first_roles: 'PM → Architect → CTO', live_generation: 'Генерация приложения', replay: 'Воспроизведение запусков', runner: 'Runner', qa_execution: 'Контроль качества', delivery: 'Доставка пакета', preview: 'Локальный preview' };
 const capabilityStatus = { available: 'Доступно', planned: 'Планируется', disabled: 'Отключено', degraded: 'Ограничено' };
 
 export function Inspector({ snapshot, events, capabilities, loading, expanded, onExpandedChange: setExpanded, connected, pending, onResolve, onQueueTool, awaitingToolEvent = false, toolRequest }: Props) {
@@ -42,6 +44,7 @@ export function Inspector({ snapshot, events, capabilities, loading, expanded, o
   const artifacts = snapshot?.artifacts ?? [];
   const attempts = snapshot?.agent_runs ?? [];
   const decisions = snapshot?.decisions ?? [];
+  const version = snapshot?.run.workflow_version;
   function selectArtifact(id: string) { if (!snapshot) return; setArtifactSelection({ runId: snapshot.run.id, id }); setTab('artifacts'); setExpanded(true); }
   function selectAttempt(id: string) { if (!snapshot) return; setAttemptSelection({ runId: snapshot.run.id, id }); setTab('attempts'); setExpanded(true); }
   function selectTool(id: string) { if (!snapshot) return; setToolSelection({ runId: snapshot.run.id, id }); setTab('tools'); setExpanded(true); }
@@ -49,12 +52,14 @@ export function Inspector({ snapshot, events, capabilities, loading, expanded, o
   const [decisionSelection, setDecisionSelection] = useState<{ runId: string; id: string } | null>(null);
   const selectedDecisionId = decisionSelection?.runId === snapshot?.run.id ? decisionSelection?.id ?? null : null;
   function selectDecision(id: string) { if (!snapshot) return; setDecisionSelection({ runId: snapshot.run.id, id }); setTab('decisions'); setExpanded(true); }
+  const previewCapability = capabilities?.capabilities.find(capability => capability.id === 'preview');
   const tabs = [
     { id: 'tasks' as const, label: 'Очередь задач', short: 'Очередь', count: tasks.length, icon: List },
     { id: 'events' as const, label: 'Журнал событий', short: 'События', count: events.length, icon: ScrollText },
     { id: 'candidate' as const, label: 'Кандидат Clinic Demo', short: 'Версия', count: snapshot?.candidate?.revision, icon: GitBranch },
     { id: 'tools' as const, label: 'Проверки', short: 'Проверки', count: snapshot?.tool_runs?.length ?? 0, icon: Terminal },
     { id: 'quality' as const, label: 'Качество QA', short: 'QA', count: snapshot?.quality_cycles?.length ?? 0, icon: FlaskConical },
+    { id: 'preview' as const, label: 'Preview', short: 'Preview', icon: Monitor },
     { id: 'artifacts' as const, label: 'Артефакты', short: 'Файлы', count: snapshot?.artifacts.length ?? 0, icon: FileBox },
     { id: 'attempts' as const, label: 'Попытки ролей', short: 'Попытки', count: attempts.length, icon: History },
     { id: 'decisions' as const, label: 'Решения автора', short: 'Решения', count: decisions.filter(decision => decision.status === 'open').length, icon: ListChecks },
@@ -73,9 +78,12 @@ export function Inspector({ snapshot, events, capabilities, loading, expanded, o
       {tab === 'tools' ? <ToolRunsPanel snapshot={snapshot} capabilities={capabilities} connected={connected} pending={pending || !onQueueTool} awaitingToolEvent={awaitingToolEvent}
         onQueue={onQueueTool ?? (async () => false)} onSelectArtifact={selectArtifact} onSelectDecision={selectDecision} selectedId={selectedToolId} onSelectAll={() => setToolSelection(null)} /> : null}
       {tab === 'quality' ? <QualityPanel snapshot={snapshot} onSelectArtifact={selectArtifact} onSelectTool={selectTool} onSelectTask={selectTask} /> : null}
+      {tab === 'preview' && expanded ? <PreviewPanel key={snapshot?.run.id} snapshot={snapshot} connected={connected}
+        availabilityReason={previewCapability && previewCapability.status !== 'available' ? previewCapability.reason ?? 'Локальный preview недоступен.' : null}
+        onSelectArtifact={selectArtifact} onSelectTool={selectTool} /> : null}
       {tab === 'attempts' ? attempts.length ? <div className="worker-data"><AttemptList key={snapshot?.run.id + ':' + selectedAttemptId} attempts={selectedAttemptId ? attempts.filter(attempt => attempt.id === selectedAttemptId) : attempts} artifacts={artifacts} tasks={tasks} onSelectArtifact={selectArtifact} active={expanded} />{selectedAttemptId ? <button type="button" className="button text" onClick={() => setAttemptSelection(null)}>Все попытки</button> : null}</div> : <EmptyState icon={<History size={26} />} title="Попыток пока нет" text="Worker сохраняет каждую попытку, её входы и результат. Live-провайдер пока недоступен." /> : null}
       {tab === 'decisions' ? decisions.length ? <div className="worker-data">{(selectedDecisionId ? decisions.filter(decision => decision.id === selectedDecisionId) : decisions).map(decision => <DecisionCard key={decision.id + ':' + decision.version}
-        decision={decision} sourceEnabled={['clinic-v2', 'clinic-v3'].includes(snapshot?.run.workflow_version ?? '')} qualityEnabled={snapshot?.run.workflow_version === 'clinic-v3'} artifacts={artifacts} pending={pending} connected={connected} onResolve={onResolve} onSelectArtifact={selectArtifact} />)}
+        decision={decision} sourceEnabled={hasCandidateWorkflow(version)} qualityEnabled={hasQualityWorkflow(version)} deliveryEnabled={version === 'clinic-v4'} artifacts={artifacts} pending={pending} connected={connected} onResolve={onResolve} onSelectArtifact={selectArtifact} />)}
         {selectedDecisionId ? <button type="button" className="button text" onClick={() => setDecisionSelection(null)}>Все решения</button> : null}</div>
         : <EmptyState icon={<ListChecks size={26} />} title="Решений пока нет" text="После оценки CTO здесь можно прочитать документы и принять или отклонить архитектуру." /> : null}
       {tab === 'capabilities' ? <div className="capability-list">{capabilities?.capabilities.length ? capabilities.capabilities.map((capability) => <div className="capability-row" key={capability.id}><strong>{capabilityNames[capability.id] ?? capability.id}</strong><span className={`capability-status ${capability.status}`}>{capabilityStatus[capability.status]}</span><p>{capability.reason ?? 'Подключено к текущему серверу.'}</p></div>) : <EmptyState icon={<Boxes size={26} />} title="Нет данных о возможностях" text="Восстановите соединение с сервером, чтобы получить актуальный список." />}</div> : null}

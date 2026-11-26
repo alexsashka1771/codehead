@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Numeric,
@@ -272,8 +273,34 @@ class ToolRun(Base):
             name="ck_tool_status",
         ),
         CheckConstraint(
-            "operation_id IN ('validate_backend','test_backend','build_frontend')",
+            "operation_id IN ('validate_backend','test_backend','build_frontend',"
+            "'smoke_test','start_preview','stop_preview')",
             name="ck_tool_operation",
+        ),
+        CheckConstraint(
+            "(operation_id IN ('validate_backend','test_backend','build_frontend') "
+            "AND delivery_id IS NULL AND preview_session_id IS NULL) OR "
+            "(operation_id = 'smoke_test' AND delivery_id IS NOT NULL "
+            "AND preview_session_id IS NULL AND qa_cycle_id IS NULL) OR "
+            "(operation_id IN ('start_preview','stop_preview') AND delivery_id IS NOT NULL "
+            "AND preview_session_id IS NOT NULL AND qa_cycle_id IS NULL)",
+            name="ck_tool_delivery_scope",
+        ),
+        ForeignKeyConstraint(
+            ("delivery_id", "run_id"),
+            ("deliveries.id", "deliveries.run_id"),
+            name="fk_tool_delivery",
+            use_alter=True,
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        ForeignKeyConstraint(
+            ("preview_session_id", "delivery_id", "run_id"),
+            ("preview_sessions.id", "preview_sessions.package_id", "preview_sessions.run_id"),
+            name="fk_tool_preview_session",
+            use_alter=True,
+            deferrable=True,
+            initially="DEFERRED",
         ),
         CheckConstraint(
             "required_isolation = 'process_only' AND isolation_level = 'process_only'",
@@ -325,6 +352,8 @@ class ToolRun(Base):
     lease_owner: Mapped[str | None] = mapped_column(String(100))
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     qa_cycle_id: Mapped[str | None] = mapped_column(ForeignKey("quality_cycles.id"), index=True)
+    delivery_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    preview_session_id: Mapped[str | None] = mapped_column(String(36), index=True)
 
 
 class QualityCycle(Base):
@@ -360,6 +389,164 @@ class QualityCycle(Base):
     followup_task_id: Mapped[str | None] = mapped_column(ForeignKey("tasks.id"))
     blocked_reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Delivery(Base):
+    __tablename__ = "deliveries"
+    __table_args__ = (
+        UniqueConstraint("run_id", name="uq_delivery_run"),
+        UniqueConstraint("id", "run_id", name="uq_delivery_id_run"),
+        UniqueConstraint(
+            "id", "run_id", "package_generation", "package_tree_hash", name="uq_delivery_package"
+        ),
+        CheckConstraint(
+            "status IN ('created','publishing','smoking','analyzing','ready',"
+            "'failed','blocked','cancelled')",
+            name="ck_delivery_status",
+        ),
+        CheckConstraint(
+            "revision >= 1 AND publication_fence >= 0 AND package_generation >= 0",
+            name="ck_delivery_versions",
+        ),
+        CheckConstraint(
+            "(publication_owner IS NULL) = (publication_expires_at IS NULL) AND "
+            "(publication_owner IS NULL OR (status = 'publishing' AND package_generation > 0))",
+            name="ck_delivery_lease",
+        ),
+        CheckConstraint(
+            "(num_nonnulls(package_manifest_hash, package_manifest_byte_size, package_tree_hash, "
+            "package_archive_hash, package_archive_byte_size, package_payload_byte_size, "
+            "package_file_count) = 0 AND status NOT IN ('smoking','analyzing','ready')) OR "
+            "(num_nonnulls(package_manifest_hash, package_manifest_byte_size, package_tree_hash, "
+            "package_archive_hash, package_archive_byte_size, package_payload_byte_size, "
+            "package_file_count) = 7 AND package_generation > 0 AND package_manifest_byte_size > 0 "
+            "AND package_archive_byte_size > 0 AND package_payload_byte_size > 0 "
+            "AND package_file_count > 0)",
+            name="ck_delivery_package",
+        ),
+        CheckConstraint(
+            "status <> 'ready' OR (smoke_tool_run_id IS NOT NULL AND "
+            "smoke_report_artifact_id IS NOT NULL AND deployment_package_artifact_id IS NOT NULL "
+            "AND runbook_artifact_id IS NOT NULL AND finished_at IS NOT NULL)",
+            name="ck_delivery_ready",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"))
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"))
+    candidate_id: Mapped[str] = mapped_column(ForeignKey("candidates.id"))
+    revision: Mapped[int] = mapped_column(Integer)
+    tree_hash: Mapped[str] = mapped_column(String(64))
+    manifest_artifact_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"))
+    manifest_hash: Mapped[str] = mapped_column(String(64))
+    profile_version: Mapped[str] = mapped_column(String(40))
+    profile_hash: Mapped[str] = mapped_column(String(64))
+    acceptance_suite_hash: Mapped[str] = mapped_column(String(64))
+    template_hash: Mapped[str] = mapped_column(String(64))
+    qa_cycle_id: Mapped[str] = mapped_column(ForeignKey("quality_cycles.id"))
+    qa_report_artifact_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"))
+    qa_report_hash: Mapped[str] = mapped_column(String(64))
+    build_tool_run_id: Mapped[str] = mapped_column(ForeignKey("tool_runs.id"))
+    build_report_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(24))
+    package_generation: Mapped[int] = mapped_column(BigInteger, default=0, server_default=text("0"))
+    package_manifest_hash: Mapped[str | None] = mapped_column(String(64))
+    package_manifest_byte_size: Mapped[int | None] = mapped_column(Integer)
+    package_tree_hash: Mapped[str | None] = mapped_column(String(64))
+    package_archive_hash: Mapped[str | None] = mapped_column(String(64))
+    package_archive_byte_size: Mapped[int | None] = mapped_column(Integer)
+    package_payload_byte_size: Mapped[int | None] = mapped_column(Integer)
+    package_file_count: Mapped[int | None] = mapped_column(Integer)
+    smoke_tool_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("tool_runs.id", deferrable=True, initially="DEFERRED")
+    )
+    smoke_report_artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"))
+    deployment_package_artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"))
+    runbook_artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"))
+    publication_owner: Mapped[str | None] = mapped_column(String(100))
+    publication_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    publication_fence: Mapped[int] = mapped_column(BigInteger, default=0, server_default=text("0"))
+    blocked_reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PreviewSession(Base):
+    __tablename__ = "preview_sessions"
+    __table_args__ = (
+        UniqueConstraint("id", "package_id", "run_id", name="uq_preview_session_scope"),
+        UniqueConstraint("run_id", "version", name="uq_preview_version"),
+        ForeignKeyConstraint(
+            ("package_id", "run_id", "package_generation", "package_tree_hash"),
+            (
+                "deliveries.id",
+                "deliveries.run_id",
+                "deliveries.package_generation",
+                "deliveries.package_tree_hash",
+            ),
+            name="fk_preview_package",
+        ),
+        CheckConstraint(
+            "status IN ('created','starting','ready','stopping','stopped','failed','uncertain')",
+            name="ck_preview_status",
+        ),
+        CheckConstraint(
+            "version >= 1 AND package_generation >= 1 AND fencing_token >= 0 "
+            "AND (backend_pid IS NULL OR backend_pid > 0) "
+            "AND (bridge_pid IS NULL OR bridge_pid > 0)",
+            name="ck_preview_versions",
+        ),
+        CheckConstraint(
+            "CASE WHEN origin IS NULL THEN true "
+            "WHEN origin ~ '^http://127[.]0[.]0[.]1:[1-9][0-9]{0,4}$' "
+            "THEN split_part(origin, ':', 3)::integer <= 65535 ELSE false END",
+            name="ck_preview_origin",
+        ),
+        CheckConstraint(
+            "status <> 'ready' OR (origin IS NOT NULL AND worker_boot_id IS NOT NULL "
+            "AND backend_pid IS NOT NULL AND bridge_pid IS NOT NULL AND ready_at IS NOT NULL "
+            "AND health_checked_at IS NOT NULL AND lease_expires_at IS NOT NULL "
+            "AND start_tool_run_id IS NOT NULL)",
+            name="ck_preview_ready",
+        ),
+        Index(
+            "uq_preview_active",
+            "run_id",
+            unique=True,
+            postgresql_where=text(
+                "status IN ('created','starting','ready','stopping','uncertain')"
+            ),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(36))
+    package_id: Mapped[str] = mapped_column(String(36))
+    package_generation: Mapped[int] = mapped_column(BigInteger)
+    package_tree_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(24))
+    version: Mapped[int] = mapped_column(BigInteger)
+    fencing_token: Mapped[int] = mapped_column(BigInteger, default=0, server_default=text("0"))
+    worker_boot_id: Mapped[str | None] = mapped_column(String(100))
+    backend_pid: Mapped[int | None] = mapped_column(Integer)
+    bridge_pid: Mapped[int | None] = mapped_column(Integer)
+    origin: Mapped[str | None] = mapped_column(String(28))
+    health_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    start_tool_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("tool_runs.id", deferrable=True, initially="DEFERRED")
+    )
+    stop_tool_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("tool_runs.id", deferrable=True, initially="DEFERRED")
+    )
+    error_code: Mapped[str | None] = mapped_column(String(100))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

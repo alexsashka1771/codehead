@@ -4,6 +4,7 @@ import * as inspector from './Inspector';
 import { DecisionCard } from './WorkerDetails';
 import { RunPanel } from './RunPanel';
 import { makeToolSnapshot } from '../state/toolFixtures';
+import { makeDeliverySnapshot } from '../state/previewFixtures';
 import type { CapabilitiesResponse, DecisionView, Snapshot, ToolCommand } from '../../../../packages/contracts';
 
 const capabilities: CapabilitiesResponse = { roles: [], capabilities: [{ id: 'runner', status: 'available', reason: 'Runner ready' }] };
@@ -18,6 +19,15 @@ function render(snapshot: Snapshot, connected = true, available = capabilities, 
     onQueue={async () => true} onSelectArtifact={() => {}} onSelectDecision={() => {}} />);
 }
 describe('Runner controls and result inspection', () => {
+  it('offers existing manual operations to active v4 candidates and identifies trusted preview operations by purpose', () => {
+    const active = makeToolSnapshot(); active.run.workflow_version = 'clinic-v4';
+    const markup = render(active);
+    expect(markup).toContain('Проверить HTTP'); expect(markup).not.toContain('disabled=""');
+    const delivered = render(makeDeliverySnapshot());
+    expect(delivered).toContain('Smoke-проверка пакета');
+    expect(delivered).toContain('Запуск preview');
+    expect(delivered).not.toContain('QA, DevOps и preview пока недоступны');
+  });
   it('visibly disables controls for an accepted command awaiting its event without inventing a saved result', () => {
     const initial = { ...makeToolSnapshot(), tool_runs: [] };
     const markup = render(initial, true, capabilities, true);

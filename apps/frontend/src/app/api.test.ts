@@ -17,7 +17,7 @@ describe('command authentication transport', () => {
     }));
     const { api } = await import('./api');
     await api.start('project-one', 'scenario-key', 'test', 'repair_success');
-    expect(bodies[0]).toMatchObject({ workflow_version: 'clinic-v3', mode: 'test', test_scenario: 'repair_success' });
+    expect(bodies[0]).toMatchObject({ workflow_version: 'clinic-v4', mode: 'test', test_scenario: 'repair_success' });
   });
   it('provides abortable read-only candidate and artifact-list endpoints scoped to the selected run', async () => {
     const paths: string[] = [];

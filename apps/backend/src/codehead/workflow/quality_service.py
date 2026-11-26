@@ -6,9 +6,11 @@ from sqlalchemy import select
 
 from codehead.clinic.files import InvalidFile, text_hash, tree_hash
 from codehead.contracts import Bug, QualityPins
+from codehead.delivery.package import document_hash
 from codehead.llm.provider import ProviderFailure
 from codehead.llm.quality_provider import evidence_status, validate_output
 from codehead.persistence.candidates import candidate_view
+from codehead.persistence.delivery import DELIVERY_VERSION
 from codehead.persistence.models import Agent, Artifact, QualityCycle, Task, ToolRun
 from codehead.persistence.service import identifier
 from codehead.persistence.tools import PIN_FIELDS, SUPPORTED_TOOLS
@@ -32,6 +34,7 @@ class QualityTransactions:
         producer_id=None,
         origin="test",
         input_versions=None,
+        author_role="qa",
     ):
         content = json.dumps(document, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
         artifact = Artifact(
@@ -42,7 +45,7 @@ class QualityTransactions:
             version=1,
             content_hash=text_hash(content),
             relative_path="",
-            author_role="qa" if task_id else None,
+            author_role=author_role if task_id else None,
             input_versions=dict(input_versions or {}),
             created_at=self.clock(),
             provenance={"origin": origin, "producer_id": producer_id, "parent_artifact_id": None},
@@ -188,6 +191,13 @@ class QualityTransactions:
                     "error_message": tool.error_message,
                     "diagnostic_excerpt": excerpt,
                     "full_output_url": f"/api/runs/{run.id}/tools",
+                    **(
+                        {"build_report_hash": document_hash(tool.report)}
+                        if run.workflow_version == DELIVERY_VERSION
+                        and tool.operation_id == "build_frontend"
+                        and tool.report is not None
+                        else {}
+                    ),
                     **{name: getattr(cycle, name) for name in QualityPins.model_fields},
                 },
                 task_id=cycle.task_id,
@@ -435,6 +445,9 @@ class QualityTransactions:
         ]
         cycle.status, cycle.finished_at = report["status"], self.clock()
         if cycle.status == "passed":
+            if run.workflow_version == DELIVERY_VERSION:
+                self._prepare_delivery(session, run, cycle, report_artifact)
+                return
             self._block(
                 session,
                 run,

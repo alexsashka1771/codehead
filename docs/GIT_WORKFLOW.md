@@ -2,7 +2,7 @@
 
 24 ноября 2026 года автор поручил начать ведение Git и заливку проекта в аккаунт [alexsashka1771](https://github.com/alexsashka1771). Создан приватный репозиторий [alexsashka1771/codehead](https://github.com/alexsashka1771/codehead); глобальные настройки Git не меняются. `origin` использует username alexsashka1771 для однозначного выбора аккаунта Git Credential Manager.
 
-`main` хранит проверенную основу. Кандидат Clinic Demo сохранён в `feat/clinic-candidate`; Runner 4.1 — в `codex/runner-checks`, QA и repair 4.2 продолжаются в `codex/qa-repair` от проверенного Runner. После законченного шага создаётся отдельный осмысленный коммит с фактическими проверками; сообщения — conventional commits на английском. Обычные commit/push этого проекта разрешены просьбой автора о ведении Git. Force push, reset --hard, удаление истории/веток и смена видимости требуют отдельного решения.
+`main` хранит проверенную основу. Кандидат Clinic Demo сохранён в `feat/clinic-candidate`, Runner 4.1 в `codex/runner-checks`, QA и repair 4.2 в `codex/qa-repair`. DevOps и preview 4.3 ведутся в `codex/devops-preview` от `ed6ab36`. После проверок каждого шага создаётся один осмысленный коммит с сообщением в формате conventional commits на английском. Обычные commit/push этого проекта разрешены поручением автора о ведении Git. Force push, reset --hard, удаление истории и веток и смена видимости требуют отдельного решения.
 
 Коммиты используют публичную GitHub-идентичность автора через окружение текущего процесса:
 

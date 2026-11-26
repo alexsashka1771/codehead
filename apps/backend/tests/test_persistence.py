@@ -6,8 +6,10 @@ from conftest import command_headers
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
+from codehead.contracts import StartRun
 from codehead.main import create_app
 from codehead.persistence.models import CommandReceipt, Event, Run
+from codehead.persistence.service import payload_hash
 
 pytestmark = pytest.mark.integration
 
@@ -49,6 +51,62 @@ def test_same_key_with_changed_payload_is_a_conflict(client, project):
     response = start(client, project, key, limits={"max_llm_calls": 12})
     assert response.status_code == 409
     assert response.json()["code"] == "conflict"
+
+
+@pytest.mark.parametrize("version", ["clinic-v1", "clinic-v2", "clinic-v3"])
+def test_implicit_start_replays_a_historical_default_receipt(client, database, project, version):
+    key = str(uuid4())
+    saved = start(client, project, key, workflow_version="clinic-v3").json()
+    saved["workflow_version"] = version
+    with database.sessions.begin() as session:
+        run = session.get(Run, saved["id"])
+        run.workflow_version = version
+        receipt = session.get(CommandReceipt, (f"start:{project['id']}", key))
+        receipt.response = saved
+        receipt.params_hash = payload_hash(StartRun(workflow_version="clinic-v3"))
+
+    replay = start(client, project, key)
+    assert replay.status_code == 201
+    assert replay.json() == saved
+    assert start(client, project, key, workflow_version="clinic-v4").status_code == 409
+    if version != "clinic-v1":
+        assert start(client, project, key, workflow_version=version).json() == saved
+    assert start(client, project, key, limits={"max_llm_calls": 8}).status_code == 409
+
+
+@pytest.mark.parametrize("version,other", [("clinic-v2", "clinic-v4"), ("clinic-v4", "clinic-v3")])
+def test_explicit_start_version_is_bound_to_one_run(client, project, version, other):
+    key = str(uuid4())
+    created = start(client, project, key, workflow_version=version)
+    assert created.status_code == 201
+    assert created.json()["workflow_version"] == version
+    assert start(client, project, key, workflow_version=version).json() == created.json()
+    assert start(client, project, key).json() == created.json()
+    assert start(client, project, key, workflow_version=other).status_code == 409
+
+
+def test_legacy_snapshot_and_workflow_event_default_to_empty_delivery_state(
+    client, database, project
+):
+    run = start(client, project, workflow_version="clinic-v3", mode="test").json()
+    service = client.app.state.service
+    with database.sessions.begin() as session:
+        row = service._run(session, run["id"], for_update=True)
+        saved = service._emit_workflow(session, row, "worker.connected")
+        event = session.get(Event, saved.event_id)
+        event.payload = {
+            name: value
+            for name, value in event.payload.items()
+            if name not in {"delivery", "preview_sessions"}
+        }
+
+    snapshot = client.get(f"/api/runs/{run['id']}/snapshot").json()
+    event = client.get(f"/api/runs/{run['id']}/events?after_seq={saved.seq - 1}").json()["events"][
+        0
+    ]
+    for state in (snapshot, event["payload"]):
+        assert state["delivery"] is None
+        assert state["preview_sessions"] == []
 
 
 def test_concurrent_start_creates_one_run(client, project, database):

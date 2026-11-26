@@ -61,6 +61,10 @@ export function App() {
     && !stream.snapshot.tool_runs?.some(tool => tool.id === accepted.toolRunId));
   const testCapability = workspace.capabilities?.capabilities.find(capability => capability.id === 'test_execution');
   const qaCapability = workspace.capabilities?.capabilities.find(capability => capability.id === 'qa_execution');
+  const deliveryCapability = workspace.capabilities?.capabilities.find(capability => capability.id === 'delivery');
+  const testReason = deliveryCapability?.status !== 'available' ? deliveryCapability?.reason ?? 'Worker доставки clinic-v4 сейчас недоступен.'
+    : qaCapability?.status !== 'available' ? qaCapability?.reason ?? 'QA worker сейчас недоступен.'
+      : testCapability?.status !== 'available' ? testCapability?.reason ?? 'Тестовый worker сейчас недоступен.' : null;
 
   useEffect(() => {
     try { localStorage.setItem('codehead.theme.v1', night ? 'night' : 'day'); }
@@ -242,8 +246,7 @@ export function App() {
             loading={workspace.runsLoading} pending={workspace.pending} hasProject={Boolean(workspace.project)}
             connected={connected} usage={stream.usage} onSelectRun={workspace.selectRun} onStart={() => start('live')}
             onStartTest={scenario => start('test', scenario)} testScenario={workspace.testScenario} onScenarioChange={workspace.selectTestScenario}
-            testAvailable={testCapability?.status === 'available' && qaCapability?.status === 'available'}
-            testReason={qaCapability?.status !== 'available' ? qaCapability?.reason ?? 'QA worker сейчас недоступен.' : testCapability?.reason}
+            testAvailable={testReason === null} testReason={testReason}
             onCommand={value => void command(value)} /> : null}
         </div>
       </aside>

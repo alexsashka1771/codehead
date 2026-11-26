@@ -20,8 +20,10 @@ from codehead.contracts import (
     CreateProject,
     DecisionResolution,
     DecisionView,
+    DeliveryView,
     DomainEvent,
     EventsPage,
+    PreviewSessionView,
     ProjectView,
     QualityCycleView,
     RunCancelledEvent,
@@ -46,6 +48,7 @@ from codehead.contracts import (
 from codehead.errors import DomainError
 from codehead.persistence.candidates import candidate_view
 from codehead.persistence.database import Database
+from codehead.persistence.delivery import DeliveryTransactions
 from codehead.persistence.models import (
     Agent,
     AgentRun,
@@ -53,6 +56,7 @@ from codehead.persistence.models import (
     Candidate,
     CommandReceipt,
     Decision,
+    Delivery,
     Event,
     Project,
     QualityCycle,
@@ -60,9 +64,12 @@ from codehead.persistence.models import (
     Task,
     WorkerHeartbeat,
 )
+from codehead.persistence.preview import PreviewTransactions
 from codehead.persistence.tools import ToolTransactions
 from codehead.workflow.definition import (
+    CANDIDATE_WORKFLOW_VERSIONS,
     DEPENDENCIES,
+    QUALITY_WORKFLOW_VERSIONS,
     ROLE_DEFINITIONS,
     ROLE_ORDER,
     TASK_TYPES,
@@ -72,6 +79,7 @@ from codehead.workflow.transitions import transition_run
 EVENT_ADAPTER = TypeAdapter(DomainEvent)
 TERMINAL_RUNS = ("succeeded", "failed", "cancelled")
 COMMAND_LOCK = 731204181
+COMMAND_PARAMS_CONFLICT = "Этот ключ команды уже использован с другими параметрами."
 
 
 def now() -> datetime:
@@ -85,7 +93,7 @@ def identifier() -> str:
 def payload_hash(payload) -> str:
     value = payload.model_dump(mode="json")
     if isinstance(payload, StartRun):
-        if value.get("workflow_version") == "clinic-v3":
+        if value.get("workflow_version") in QUALITY_WORKFLOW_VERSIONS:
             value.pop("workflow_version", None)
         if value.get("test_scenario") == "standard":
             value.pop("test_scenario", None)
@@ -101,10 +109,13 @@ def payload_hash(payload) -> str:
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
-class ProjectService(ToolTransactions):
-    def __init__(self, database: Database):
+class ProjectService(PreviewTransactions, DeliveryTransactions, ToolTransactions):
+    def __init__(self, database: Database, *, package_compiler=None):
+        from codehead.delivery.package import PackageCompiler
+
         self.database = database
         self.clock = now
+        self.package_compiler = package_compiler or PackageCompiler()
 
     @staticmethod
     def _lock_commands(session):
@@ -114,10 +125,30 @@ class ProjectService(ToolTransactions):
     def _receipt(session, scope, key, digest):
         receipt = session.get(CommandReceipt, (scope, key))
         if receipt and receipt.params_hash != digest:
-            raise DomainError(
-                "conflict", "Этот ключ команды уже использован с другими параметрами."
-            )
+            raise DomainError("conflict", COMMAND_PARAMS_CONFLICT)
         return receipt.response if receipt else None
+
+    def _start_receipt(self, session, scope, key, digest, command: StartRun) -> RunView | None:
+        receipt = session.get(CommandReceipt, (scope, key))
+        if receipt is None:
+            return None
+        response = RunView.model_validate(receipt.response)
+        historical = self._run(session, response.id)
+        if (
+            "workflow_version" in command.model_fields_set
+            and command.workflow_version != historical.workflow_version
+        ):
+            raise DomainError("conflict", COMMAND_PARAMS_CONFLICT)
+        allowed_digests = {digest}
+        if historical.workflow_version == "clinic-v2":
+            # The same v2 workflow was implicit before v3 and explicit afterward.
+            allowed_digests.update(
+                payload_hash(command.model_copy(update={"workflow_version": version}))
+                for version in ("clinic-v2", "clinic-v3")
+            )
+        if receipt.params_hash not in allowed_digests:
+            raise DomainError("conflict", COMMAND_PARAMS_CONFLICT)
+        return response
 
     @staticmethod
     def _save_receipt(session, scope, key, digest, response):
@@ -275,6 +306,8 @@ class ProjectService(ToolTransactions):
             candidate=candidate_view(session, run.id),
             tool_runs=[ToolRunView.model_validate(tool) for tool in self._tools(session, run.id)],
             quality_cycles=self._quality_views(session, run.id),
+            delivery=self._delivery_view(session, run.id),
+            preview_sessions=self._preview_views(session, run.id),
         )
 
     @staticmethod
@@ -286,6 +319,17 @@ class ProjectService(ToolTransactions):
                 .where(QualityCycle.run_id == run_id)
                 .order_by(QualityCycle.iteration)
             )
+        ]
+
+    @staticmethod
+    def _delivery_view(session, run_id):
+        row = session.scalar(select(Delivery).where(Delivery.run_id == run_id))
+        return DeliveryView.model_validate(row) if row is not None else None
+
+    def _preview_views(self, session, run_id):
+        return [
+            PreviewSessionView.model_validate(preview)
+            for preview in self._previews(session, run_id)
         ]
 
     def _emit_workflow(
@@ -308,7 +352,7 @@ class ProjectService(ToolTransactions):
             for tool in tools:
                 if tool.status == "created":
                     if (
-                        tool.qa_cycle_id is not None
+                        (tool.qa_cycle_id is not None or tool.operation_id == "smoke_test")
                         and run.pause_requested
                         and not run.cancel_requested
                     ):
@@ -342,12 +386,15 @@ class ProjectService(ToolTransactions):
                     task.record_version += 1
                     agent = session.get(Agent, attempt.agent_id)
                     agent.lifecycle, agent.activity, agent.current_task_id = "idle", None, None
-        running = any(attempt.status == "running" for attempt in attempts) or any(
-            tool.status == "running" for tool in tools
+        running = (
+            any(attempt.status == "running" for attempt in attempts)
+            or any(tool.status == "running" for tool in tools)
+            or self._has_active_delivery_publication(session, run.id)
         )
         uncertain = any(attempt.status == "uncertain" for attempt in attempts) or any(
             tool.status == "uncertain" for tool in tools
         )
+        self._settle_delivery_control(session, run, running=running, uncertain=uncertain)
         if run.cancel_requested:
             if uncertain:
                 run.status, run.blocked_reason = (
@@ -467,9 +514,9 @@ class ProjectService(ToolTransactions):
         with self.database.sessions.begin() as session:
             self._lock_commands(session)
             project = self._project(session, project_id)
-            existing = self._receipt(session, scope, key, digest)
-            if existing:
-                return RunView.model_validate(existing)
+            existing = self._start_receipt(session, scope, key, digest, command)
+            if existing is not None:
+                return existing
             if session.scalar(select(Run.id).where(Run.status.not_in(TERMINAL_RUNS)).limit(1)):
                 raise DomainError(
                     "conflict", "Уже есть незавершённый запуск. Завершите или отмените его."
@@ -719,6 +766,8 @@ class ProjectService(ToolTransactions):
                     ToolRunView.model_validate(tool) for tool in self._tools(session, run.id)
                 ],
                 quality_cycles=self._quality_views(session, run.id),
+                delivery=self._delivery_view(session, run.id),
+                preview_sessions=self._preview_views(session, run.id),
             )
 
     def usage(self, run_id: str) -> UsageSummary:
@@ -892,7 +941,7 @@ class ProjectService(ToolTransactions):
                 attempt = session.get(AgentRun, decision.attempt_id)
                 if (
                     decision.kind != "file_conflict"
-                    or run.workflow_version not in {"clinic-v2", "clinic-v3"}
+                    or run.workflow_version not in CANDIDATE_WORKFLOW_VERSIONS
                     or task.role not in {"backend", "frontend"}
                     or task.status != "waiting_for_decision"
                     or attempt is None

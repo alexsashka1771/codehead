@@ -17,11 +17,14 @@ from codehead.clinic.files import (
 )
 from codehead.clinic.profile import REPOSITORY_ROOT, load_profile
 from codehead.clinic.workspace import materialize
+from codehead.delivery.runtime import PreviewRuntime
 from codehead.errors import DomainError
+from codehead.llm.delivery_provider import validate_output as validate_delivery_output
 from codehead.llm.provider import LiveProviderUnavailable, ProviderFailure, ProviderRequest
 from codehead.llm.redaction import redact
 from codehead.llm.test_provider import TestProvider
 from codehead.persistence.candidates import CandidateStore
+from codehead.persistence.delivery import DELIVERY_VERSION, RUNTIME_TOOLS
 from codehead.persistence.models import (
     Agent,
     AgentRun,
@@ -35,6 +38,10 @@ from codehead.persistence.models import (
 )
 from codehead.persistence.service import ProjectService, identifier, now
 from codehead.persistence.tools import SUPPORTED_TOOLS
+from codehead.settings import Settings
+from codehead.workflow.definition import CANDIDATE_WORKFLOW_VERSIONS, QUALITY_WORKFLOW_VERSIONS
+from codehead.workflow.delivery_service import DELIVERY_BUDGET_REASON, DeliveryWorkflow
+from codehead.workflow.preview_service import PreviewWorkflow
 from codehead.workflow.publication import NEXT_STAGE_REASON, PublicationTransactions
 from codehead.workflow.quality_service import QUALITY_BOUNDARY, QualityTransactions
 
@@ -42,11 +49,13 @@ DOCUMENT_ROLES = ("product_manager", "architect", "cto")
 SOURCE_ROLES = ("backend", "frontend")
 SUPPORTED_ROLES = DOCUMENT_ROLES + SOURCE_ROLES
 QUALITY_ROLES = SUPPORTED_ROLES + ("qa",)
+DELIVERY_ROLES = QUALITY_ROLES + ("devops",)
 ARTIFACT_KINDS = {
     "product_manager": {"requirements"},
     "architect": {"architecture", "api_contract"},
     "cto": {"decision"},
     "qa": {"test_report", "bug"},
+    "devops": {"deployment_package", "runbook"},
 }
 
 
@@ -62,7 +71,9 @@ class Lease:
     provider: object
 
 
-class WorkerService(QualityTransactions, PublicationTransactions, ProjectService):
+class WorkerService(
+    PreviewWorkflow, DeliveryWorkflow, QualityTransactions, PublicationTransactions, ProjectService
+):
     def __init__(
         self,
         database,
@@ -74,8 +85,12 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
         workspace_root=None,
         materializer=materialize,
         tool_runner=None,
+        package_compiler=None,
+        preview_runtime=None,
+        preview_data_root=None,
+        frame_origins=None,
     ):
-        super().__init__(database)
+        super().__init__(database, package_compiler=package_compiler)
         if not 1 <= lease_seconds <= 300:
             raise ValueError("Lease duration must be between 1 and 300 seconds")
         self.clock = clock
@@ -89,13 +104,22 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
         ).absolute()
         self.materializer = materializer
         self.tool_runner = tool_runner
-        self.supported_tools = SUPPORTED_TOOLS
+        self.supported_tools = (*SUPPORTED_TOOLS, *RUNTIME_TOOLS)
+        self.preview_runtime = preview_runtime or PreviewRuntime(
+            compiler=self.package_compiler,
+            frame_origins=frame_origins
+            if frame_origins is not None
+            else Settings().allowed_origins,
+        )
+        self.preview_data_root = Path(preview_data_root or REPOSITORY_ROOT / ".data" / "preview")
 
     @staticmethod
     def _supported_roles(run):
         return (
-            QUALITY_ROLES
-            if run.workflow_version == "clinic-v3"
+            DELIVERY_ROLES
+            if run.workflow_version == DELIVERY_VERSION
+            else QUALITY_ROLES
+            if run.workflow_version in QUALITY_WORKFLOW_VERSIONS
             else SUPPORTED_ROLES
             if run.workflow_version == "clinic-v2"
             else DOCUMENT_ROLES
@@ -105,9 +129,9 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
         stamp = self.clock()
         heartbeat = session.get(WorkerHeartbeat, owner)
         if heartbeat is None:
-            heartbeat = WorkerHeartbeat(owner=owner, supported_roles=list(QUALITY_ROLES))
+            heartbeat = WorkerHeartbeat(owner=owner, supported_roles=list(DELIVERY_ROLES))
             session.add(heartbeat)
-        heartbeat.supported_roles = list(QUALITY_ROLES)
+        heartbeat.supported_roles = list(DELIVERY_ROLES)
         heartbeat.supported_tools = list(self.supported_tools)
         heartbeat.updated_at = stamp
         heartbeat.expires_at = stamp + timedelta(seconds=self.lease_seconds)
@@ -139,6 +163,8 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
                         version = (
                             "worker-test-qa-v1"
                             if agent.role == "qa"
+                            else "worker-test-devops-v1"
+                            if agent.role == "devops"
                             else "worker-test-v2"
                             if source
                             else "worker-test-v1"
@@ -175,27 +201,35 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
                 .where(WorkerHeartbeat.owner != owner, WorkerHeartbeat.expires_at > self.clock())
                 .limit(1)
             )
-            if another is not None:
-                return
-            for run in session.scalars(
-                select(Run)
-                .where(Run.status.in_(["created", "running", "pausing", "paused", "blocked"]))
-                .with_for_update()
-            ):
-                changed = False
-                for agent in self._agents(session, run.id):
-                    if agent.lifecycle != "offline":
-                        agent.lifecycle, agent.activity = "offline", None
-                        changed = True
-                if changed:
-                    self._emit_workflow(session, run, "worker.disconnected", actor_id=owner)
+            if another is None:
+                for run in session.scalars(
+                    select(Run)
+                    .where(Run.status.in_(["created", "running", "pausing", "paused", "blocked"]))
+                    .with_for_update()
+                ):
+                    changed = False
+                    for agent in self._agents(session, run.id):
+                        if agent.lifecycle != "offline":
+                            agent.lifecycle, agent.activity = "offline", None
+                            changed = True
+                    if changed:
+                        self._emit_workflow(session, run, "worker.disconnected", actor_id=owner)
+        self.recover_previews(disconnected_owner=owner)
 
     def _block(self, session, run, tasks, reason, action):
         run.status = "blocked"
         run.blocked_reason = reason
         agents = {agent.role: agent for agent in self._agents(session, run.id)}
         for task in tasks:
-            if task.role == "qa" and run.workflow_version == "clinic-v3":
+            if task.role == "devops" and run.workflow_version == DELIVERY_VERSION:
+                delivery = self._delivery(session, run.id)
+                if delivery is not None and delivery.status not in {
+                    "failed",
+                    "cancelled",
+                    "blocked",
+                }:
+                    self._mark_delivery_terminal(delivery, "blocked", reason)
+            if task.role == "qa" and run.workflow_version in QUALITY_WORKFLOW_VERSIONS:
                 cycle = self._cycle(session, task.id)
                 if cycle is not None:
                     self._quality_block(session, run, cycle, reason)
@@ -214,6 +248,21 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
         project = session.get(Project, run.project_id)
         if project.requirements_version != run.requirements_version:
             raise ProviderFailure("input_version_conflict", "Версия требований изменилась.")
+        if task.role == "devops":
+            try:
+                context, evidence = self._delivery_context(session, run, task)
+            except (InvalidFile, ValueError, KeyError, TypeError) as failure:
+                raise ProviderFailure(
+                    "invalid_delivery_evidence", "Закреплённые доказательства доставки изменились."
+                ) from failure
+            return ProviderRequest(
+                task.role,
+                project.name,
+                project.description,
+                run.requirements_version,
+                evidence,
+                delivery_context=context,
+            )
         tasks = {item.id: item for item in self._tasks(session, run.id)}
         ancestors = set()
         pending = list(task.dependencies)
@@ -225,7 +274,7 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
                 raise ProviderFailure("invalid_workflow", "Неверные зависимости задачи.")
             ancestors.add(dependency)
             pending.extend(tasks[dependency].dependencies)
-        source = run.workflow_version in {"clinic-v2", "clinic-v3"} and task.role in SOURCE_ROLES
+        source = run.workflow_version in CANDIDATE_WORKFLOW_VERSIONS and task.role in SOURCE_ROLES
         repair = source and task.task_type == "backend_repair"
         inputs = []
         for artifact in session.scalars(
@@ -304,7 +353,7 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
                     }
                 )
         quality_context = None
-        if task.role == "qa" and run.workflow_version == "clinic-v3":
+        if task.role == "qa" and run.workflow_version in QUALITY_WORKFLOW_VERSIONS:
             quality_context = self._quality_context(session, run, task)
             cycle = self._cycle(session, task.id)
             view = self.candidates.view(session, run.id)
@@ -357,13 +406,21 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
         with self.database.sessions.begin() as session:
             run = session.scalar(
                 select(Run)
-                .where(Run.status.in_(["created", "running"]), Run.cancel_requested.is_(False))
+                .where(
+                    Run.status.in_(["created", "running"]),
+                    Run.cancel_requested.is_(False),
+                    Run.pause_requested.is_(False),
+                )
                 .order_by(Run.created_at)
                 .with_for_update(skip_locked=True)
             )
             if run is None:
                 return None
             self._accept_in_session(session, run)
+            delivery = self._delivery(session, run.id)
+            if self._finish_ready_run(session, run, delivery):
+                self._emit_workflow(session, run, "run.succeeded", actor_id=owner)
+                return None
             tasks = self._tasks(session, run.id)
             succeeded = {task.id for task in tasks if task.status == "succeeded"}
             ready = [
@@ -373,21 +430,27 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
                     task.status == "queued"
                     or task.status == "running"
                     and task.role == "qa"
-                    and run.workflow_version == "clinic-v3"
+                    and run.workflow_version in QUALITY_WORKFLOW_VERSIONS
                 )
                 and task.active_attempt_id is None
                 and all(dependency in succeeded for dependency in task.dependencies)
                 and (
                     task.role != "qa"
-                    or run.workflow_version != "clinic-v3"
+                    or run.workflow_version not in QUALITY_WORKFLOW_VERSIONS
                     or self._cycle(session, task.id) is not None
                     and self._cycle(session, task.id).status == "analyzing"
+                )
+                and (
+                    task.role != "devops"
+                    or run.workflow_version != DELIVERY_VERSION
+                    or delivery is not None
+                    and delivery.status == "analyzing"
                 )
             ]
             if not ready:
                 return None
             if ready[0].role not in self._supported_roles(run):
-                if run.workflow_version in {"clinic-v2", "clinic-v3"}:
+                if run.workflow_version in CANDIDATE_WORKFLOW_VERSIONS:
                     candidate = session.scalar(select(Candidate).where(Candidate.run_id == run.id))
                     if candidate is not None and candidate.status == "materializing":
                         return None
@@ -396,7 +459,7 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
                     run,
                     ready,
                     QUALITY_BOUNDARY
-                    if run.workflow_version == "clinic-v3"
+                    if run.workflow_version in QUALITY_WORKFLOW_VERSIONS
                     else NEXT_STAGE_REASON
                     if run.workflow_version == "clinic-v2"
                     else "Следующий этап Clinic Demo ещё не подключён: Backend/Frontend.",
@@ -431,22 +494,13 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
                     "budget.exceeded",
                 )
                 return None
-            if (
-                sum(attempt.status in {"created", "running"} for attempt in attempts)
-                + sum(
-                    tool.status == "running"
-                    or tool.status == "created"
-                    and tool.lease_owner is not None
-                    for tool in self._tools(session, run.id)
-                )
-                >= limits["max_parallel_tasks"]
-            ):
+            if self._occupied_slots(session, run) >= limits["max_parallel_tasks"]:
                 return None
             selected_provider = provider or (
                 TestProvider(
                     secrets=self.secrets,
                     delay_seconds=self.step_delay,
-                    with_files=run.workflow_version in {"clinic-v2", "clinic-v3"},
+                    with_files=run.workflow_version in CANDIDATE_WORKFLOW_VERSIONS,
                 )
                 if run.mode == "test"
                 else LiveProviderUnavailable()
@@ -496,10 +550,13 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
                 "backend": "coding",
                 "frontend": "coding",
                 "qa": "analyzing",
+                "devops": "building",
             }[task.role]
             agent.location = (
                 "qa"
                 if task.role == "qa"
+                else "devops"
+                if task.role == "devops"
                 else "development"
                 if task.role in SOURCE_ROLES
                 else "product"
@@ -540,6 +597,11 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
                     ),
                     **(
                         {"repair_context": request.repair_context} if request.repair_context else {}
+                    ),
+                    **(
+                        {"delivery_context": request.delivery_context["package"]}
+                        if request.delivery_context
+                        else {}
                     ),
                     **(
                         {
@@ -645,7 +707,11 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
                     "budget.exceeded",
                 )
                 return False
-            if run.status not in {"created", "running"} or run.cancel_requested:
+            if (
+                run.status not in {"created", "running"}
+                or run.cancel_requested
+                or run.pause_requested
+            ):
                 attempt.status = "cancelled"
                 attempt.finished_at = self.clock()
                 self._release(task)
@@ -813,6 +879,28 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
             if task.role == "qa" and not run.cancel_requested:
                 self._validate_quality_result(session, run, task, result)
             self._save_result(attempt, result)
+            if task.role == "devops" and not run.cancel_requested:
+                if self._remaining_duration(run) <= 0:
+                    attempt.status = "succeeded"
+                    self._release(task)
+                    self._block(session, run, [task], DELIVERY_BUDGET_REASON, "budget.exceeded")
+                    self._settle_control(session, run)
+                    return
+                try:
+                    current = self._request(session, run, task)
+                    if current != lease.request:
+                        raise ProviderFailure(
+                            "invalid_delivery_evidence", "Источники DevOps изменились."
+                        )
+                    validate_delivery_output(current, result)
+                except ProviderFailure as failure:
+                    raise ProviderFailure(
+                        failure.code,
+                        failure.message,
+                        dispatched=True,
+                        raw_response=result.raw_response,
+                        stop_reason=result.stop_reason,
+                    ) from failure
             if source and not run.cancel_requested:
                 try:
                     self.candidates.apply(
@@ -910,6 +998,8 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
                 self._candidate_progress(session, run)
             elif task.role == "qa":
                 self._quality_completed(session, run, task, artifact_ids)
+            elif task.role == "devops":
+                action = self._delivery_completed(session, run, task, artifact_ids)
             self._settle_control(session, run)
             self._emit_workflow(session, run, action, actor_id=lease.owner, task_id=task.id)
 
@@ -946,6 +1036,12 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
                         attempt.error_message,
                         self.clock(),
                     )
+            if task.role == "devops":
+                self._mark_delivery_terminal(
+                    self._delivery(session, run.id),
+                    "blocked" if failure.uncertain or not failure.dispatched else "failed",
+                    attempt.error_message,
+                )
             run.status, run.blocked_reason = "blocked", attempt.error_message
             agent = next(
                 item for item in self._agents(session, run.id) if item.id == attempt.agent_id
@@ -979,7 +1075,7 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
             )
 
     def recover(self):
-        recovered = 0
+        recovered = self.recover_previews()
         with self.database.sessions.begin() as session:
             runs = list(
                 session.scalars(
@@ -991,6 +1087,7 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
             for run in runs:
                 recovered += self._recover_tools(session, run)
                 recovered += self._recover_publication(session, run)
+                recovered += self._recover_delivery(session, run)
                 connected = (
                     session.scalar(
                         select(WorkerHeartbeat.owner)
@@ -1039,7 +1136,7 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
                     if sent:
                         task.status, task.blocked_reason = "blocked", attempt.error_message
                         run.status, run.blocked_reason = "blocked", attempt.error_message
-                        if task.role == "qa" and run.workflow_version == "clinic-v3":
+                        if task.role == "qa" and run.workflow_version in QUALITY_WORKFLOW_VERSIONS:
                             cycle = self._cycle(session, task.id)
                             if cycle is not None:
                                 cycle.status, cycle.blocked_reason, cycle.finished_at = (
@@ -1047,6 +1144,10 @@ class WorkerService(QualityTransactions, PublicationTransactions, ProjectService
                                     attempt.error_message,
                                     self.clock(),
                                 )
+                        if task.role == "devops":
+                            self._mark_delivery_terminal(
+                                self._delivery(session, run.id), "blocked", attempt.error_message
+                            )
                         self._decision(
                             session,
                             run,

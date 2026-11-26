@@ -21,6 +21,7 @@ def main():
         lease_seconds=settings.worker_lease_seconds,
         step_delay=settings.test_step_delay_seconds,
         secrets=(settings.command_token.get_secret_value(),),
+        frame_origins=settings.allowed_origins,
     )
     stopped = threading.Event()
     signal.signal(signal.SIGINT, lambda *_: stopped.set())

@@ -13,7 +13,7 @@ export type MaxDurationSeconds = number;
 export type MaxFileBytes = number;
 export type MaxFilesPerProposal = number;
 export type MaxProposalBytes = number;
-export type WorkflowVersion = 'clinic-v2' | 'clinic-v3';
+export type WorkflowVersion = 'clinic-v2' | 'clinic-v3' | 'clinic-v4';
 export type TestScenario = 'standard' | 'repair_success' | 'repair_blocked';
 export type Command = 'pause' | 'resume' | 'cancel' | 'retry_failed';
 export type SchemaVersion = 1;
@@ -175,7 +175,8 @@ export type WorkspacePath = string | null;
 export type BlockedReason2 = string | null;
 export type ManifestHash = string | null;
 export type ManifestByteSize = number | null;
-export type OperationId = 'validate_backend' | 'test_backend' | 'build_frontend';
+export type OperationId =
+  'validate_backend' | 'test_backend' | 'build_frontend' | 'smoke_test' | 'start_preview' | 'stop_preview';
 export type WorkspaceId = string;
 export type SnapshotVersion = number;
 export type RequiredIsolation = 'process_only' | 'container' | 'remote';
@@ -209,6 +210,8 @@ export type FencingToken2 = number;
 export type LeaseOwner1 = string | null;
 export type LeaseExpiresAt1 = string | null;
 export type QaCycleId = string | null;
+export type DeliveryId = string | null;
+export type PreviewSessionId = string | null;
 export type ToolRuns = ToolRunView[];
 export type RunId7 = string;
 export type TaskId3 = string;
@@ -234,14 +237,64 @@ export type BlockedReason3 = string | null;
 export type CreatedAt8 = string;
 export type FinishedAt3 = string | null;
 export type QualityCycles = QualityCycleView[];
+export type RunId8 = string;
+export type TaskId4 = string;
+export type CandidateId1 = string;
+export type Revision2 = number;
+export type TreeHash3 = string;
+export type ManifestArtifactId3 = string;
+export type ManifestHash3 = string;
+export type ProfileVersion4 = string;
+export type ProfileHash4 = string;
+export type AcceptanceSuiteHash4 = string;
+export type TemplateHash4 = string;
+export type Id10 = string;
+export type Status5 = 'created' | 'publishing' | 'smoking' | 'analyzing' | 'ready' | 'failed' | 'blocked' | 'cancelled';
+export type QaCycleId1 = string;
+export type QaReportArtifactId = string;
+export type QaReportHash = string;
+export type BuildToolRunId = string;
+export type BuildReportHash = string;
+export type PackageGeneration = number;
+export type PackageManifestHash = string | null;
+export type PackageManifestByteSize = number | null;
+export type PackageTreeHash = string | null;
+export type PackageArchiveHash = string | null;
+export type PackageArchiveByteSize = number | null;
+export type PackagePayloadByteSize = number | null;
+export type PackageFileCount = number | null;
+export type SmokeToolRunId = string | null;
+export type SmokeReportArtifactId = string | null;
+export type DeploymentPackageArtifactId = string | null;
+export type RunbookArtifactId = string | null;
+export type BlockedReason4 = string | null;
+export type CreatedAt9 = string;
+export type UpdatedAt1 = string;
+export type FinishedAt4 = string | null;
+export type Id11 = string;
+export type RunId9 = string;
+export type PackageId = string;
+export type PackageGeneration1 = number;
+export type PackageTreeHash1 = string;
+export type Status6 = 'created' | 'starting' | 'ready' | 'stopping' | 'stopped' | 'failed' | 'uncertain';
+export type Version3 = number;
+export type StartToolRunId = string | null;
+export type StopToolRunId = string | null;
+export type ErrorCode2 = string | null;
+export type ErrorMessage2 = string | null;
+export type CreatedAt10 = string;
+export type UpdatedAt2 = string;
+export type ReadyAt = string | null;
+export type FinishedAt5 = string | null;
+export type PreviewSessions = PreviewSessionView[];
 export type EventId = string;
 export type SchemaVersion1 = 1;
 export type ProjectId1 = string;
-export type RunId8 = string;
+export type RunId10 = string;
 export type Seq = number;
 export type OccurredAt = string;
 export type ActorId = string | null;
-export type TaskId4 = string | null;
+export type TaskId5 = string | null;
 export type CorrelationId = string;
 export type CausationId = string | null;
 export type EventType = 'run.created';
@@ -249,22 +302,22 @@ export type Agents1 = AgentView[];
 export type EventId1 = string;
 export type SchemaVersion2 = 1;
 export type ProjectId2 = string;
-export type RunId9 = string;
+export type RunId11 = string;
 export type Seq1 = number;
 export type OccurredAt1 = string;
 export type ActorId1 = string | null;
-export type TaskId5 = string | null;
+export type TaskId6 = string | null;
 export type CorrelationId1 = string;
 export type CausationId1 = string | null;
 export type EventType1 = 'task.queued';
 export type EventId2 = string;
 export type SchemaVersion3 = 1;
 export type ProjectId3 = string;
-export type RunId10 = string;
+export type RunId12 = string;
 export type Seq2 = number;
 export type OccurredAt2 = string;
 export type ActorId2 = string | null;
-export type TaskId6 = string | null;
+export type TaskId7 = string | null;
 export type CorrelationId2 = string;
 export type CausationId2 = string | null;
 export type EventType2 = 'run.paused';
@@ -273,44 +326,44 @@ export type Agents2 = AgentView[];
 export type EventId3 = string;
 export type SchemaVersion4 = 1;
 export type ProjectId4 = string;
-export type RunId11 = string;
+export type RunId13 = string;
 export type Seq3 = number;
 export type OccurredAt3 = string;
 export type ActorId3 = string | null;
-export type TaskId7 = string | null;
+export type TaskId8 = string | null;
 export type CorrelationId3 = string;
 export type CausationId3 = string | null;
 export type EventType3 = 'run.pausing';
 export type EventId4 = string;
 export type SchemaVersion5 = 1;
 export type ProjectId5 = string;
-export type RunId12 = string;
+export type RunId14 = string;
 export type Seq4 = number;
 export type OccurredAt4 = string;
 export type ActorId4 = string | null;
-export type TaskId8 = string | null;
+export type TaskId9 = string | null;
 export type CorrelationId4 = string;
 export type CausationId4 = string | null;
 export type EventType4 = 'run.resumed';
 export type EventId5 = string;
 export type SchemaVersion6 = 1;
 export type ProjectId6 = string;
-export type RunId13 = string;
+export type RunId15 = string;
 export type Seq5 = number;
 export type OccurredAt5 = string;
 export type ActorId5 = string | null;
-export type TaskId9 = string | null;
+export type TaskId10 = string | null;
 export type CorrelationId5 = string;
 export type CausationId5 = string | null;
 export type EventType5 = 'run.cancelled';
 export type EventId6 = string;
 export type SchemaVersion7 = 1;
 export type ProjectId7 = string;
-export type RunId14 = string;
+export type RunId16 = string;
 export type Seq6 = number;
 export type OccurredAt6 = string;
 export type ActorId6 = string | null;
-export type TaskId10 = string | null;
+export type TaskId11 = string | null;
 export type CorrelationId6 = string;
 export type CausationId6 = string | null;
 export type EventType6 = 'workflow.updated';
@@ -322,6 +375,7 @@ export type AgentRuns1 = AgentRunView[];
 export type Decisions1 = DecisionView[];
 export type ToolRuns1 = ToolRunView[];
 export type QualityCycles1 = QualityCycleView[];
+export type PreviewSessions1 = PreviewSessionView[];
 export type Events = (
   | RunCreatedEvent
   | TaskQueuedEvent
@@ -335,8 +389,8 @@ export type NextAfterSeq = number;
 export type HasMore = boolean;
 export type LastEventSeq2 = number;
 export type Stage = 'foundation' | 'worker';
-export type Id10 = string;
-export type Status5 = 'available' | 'planned' | 'disabled' | 'degraded';
+export type Id12 = string;
+export type Status7 = 'available' | 'planned' | 'disabled' | 'degraded';
 export type Reason = string | null;
 export type Capabilities = Capability[];
 export type Name2 = string;
@@ -352,9 +406,9 @@ export type CommandToken = string;
 export type Scope = string;
 export type Key = string;
 export type ParamsHash = string;
-export type Response = ProjectView | RunView | ToolRunView;
-export type CreatedAt9 = string;
-export type Version3 = number;
+export type Response = ProjectView | RunView | ToolRunView | PreviewSessionView;
+export type CreatedAt11 = string;
+export type Version4 = number;
 export type Choice1 = 'approve' | 'reject' | 'confirm_failed' | 'retry_with_risk' | 'retry_files';
 export type Comment1 = string;
 export type ArtifactId1 = string;
@@ -377,32 +431,7 @@ export type SnapshotVersion1 = number;
 export type RequiredIsolation1 = 'process_only' | 'container' | 'remote';
 export type TimeoutSeconds1 = number;
 export type OutputLimitBytes1 = number;
-export type RunId15 = string;
-export type TaskId11 = string;
-export type CandidateId1 = string;
-export type Revision2 = number;
-export type TreeHash3 = string;
-export type ManifestArtifactId3 = string;
-export type ManifestHash3 = string;
-export type ProfileVersion4 = string;
-export type ProfileHash4 = string;
-export type AcceptanceSuiteHash4 = string;
-export type TemplateHash4 = string;
-export type CycleId = string;
-export type Iteration2 = number;
-export type Status6 = 'passed' | 'failed';
-export type ToolRunIds1 = string[];
-export type RequirementId =
-  'REQ-001' | 'REQ-002' | 'REQ-003' | 'REQ-004' | 'REQ-005' | 'REQ-006' | 'REQ-007' | 'REQ-008';
-export type ToolRunIds2 = string[];
-export type Status7 = 'passed' | 'failed' | 'not_verified';
-export type Requirements = RequirementCheck[];
-export type Title1 = string;
-export type RequirementIds = string[];
-export type Status8 = 'proposed';
-export type ProposedTests = ProposedTest[];
-export type ResolvesBugIds = string[];
-export type RunId16 = string;
+export type RunId17 = string;
 export type TaskId12 = string;
 export type CandidateId2 = string;
 export type Revision3 = number;
@@ -413,12 +442,51 @@ export type ProfileVersion5 = string;
 export type ProfileHash5 = string;
 export type AcceptanceSuiteHash5 = string;
 export type TemplateHash5 = string;
+export type CycleId = string;
+export type Iteration2 = number;
+export type Status8 = 'passed' | 'failed';
+export type ToolRunIds1 = string[];
+export type RequirementId =
+  'REQ-001' | 'REQ-002' | 'REQ-003' | 'REQ-004' | 'REQ-005' | 'REQ-006' | 'REQ-007' | 'REQ-008';
+export type ToolRunIds2 = string[];
+export type Status9 = 'passed' | 'failed' | 'not_verified';
+export type Requirements = RequirementCheck[];
+export type Title1 = string;
+export type RequirementIds = string[];
+export type Status10 = 'proposed';
+export type ProposedTests = ProposedTest[];
+export type ResolvesBugIds = string[];
+export type RunId18 = string;
+export type TaskId13 = string;
+export type CandidateId3 = string;
+export type Revision4 = number;
+export type TreeHash5 = string;
+export type ManifestArtifactId5 = string;
+export type ManifestHash5 = string;
+export type ProfileVersion6 = string;
+export type ProfileHash6 = string;
+export type AcceptanceSuiteHash6 = string;
+export type TemplateHash6 = string;
 export type CycleId1 = string;
 export type Iteration3 = number;
-export type Status9 = 'open';
+export type Status11 = 'open';
 export type ToolRunIds3 = string[];
 export type RequirementIds1 = string[];
 export type Summary1 = string;
+export type Command1 = 'start' | 'stop';
+export type PackageId1 = string;
+export type PreviewSessionId1 = string | null;
+export type ExpectedVersion = number;
+export type RunId19 = string;
+export type PreviewSessions2 = PreviewSessionView[];
+export type RunId20 = string;
+export type Status12 = 'available' | 'unavailable';
+export type PackageId2 = string | null;
+export type PreviewSessionId2 = string | null;
+export type Version5 = number | null;
+export type Origin2 = string | null;
+export type Reason1 = string | null;
+export type HealthCheckedAt = string | null;
 
 export interface ContractBundle {
   create_project: CreateProject;
@@ -438,6 +506,8 @@ export interface ContractBundle {
   tool_command: ToolCommand;
   test_report: TestReport;
   bug: Bug;
+  preview_command: PreviewCommand;
+  preview: PreviewView;
 }
 export interface CreateProject {
   name: Name;
@@ -478,6 +548,8 @@ export interface Snapshot {
   candidate?: CandidateView | null;
   tool_runs?: ToolRuns;
   quality_cycles?: QualityCycles;
+  delivery?: DeliveryView | null;
+  preview_sessions?: PreviewSessions;
 }
 export interface ProjectView {
   name: Name1;
@@ -699,6 +771,8 @@ export interface ToolRunView {
   lease_owner?: LeaseOwner1;
   lease_expires_at?: LeaseExpiresAt1;
   qa_cycle_id?: QaCycleId;
+  delivery_id?: DeliveryId;
+  preview_session_id?: PreviewSessionId;
 }
 export interface QualityCycleView {
   run_id: RunId7;
@@ -725,6 +799,59 @@ export interface QualityCycleView {
   created_at: CreatedAt8;
   finished_at?: FinishedAt3;
 }
+export interface DeliveryView {
+  run_id: RunId8;
+  task_id: TaskId4;
+  candidate_id: CandidateId1;
+  revision: Revision2;
+  tree_hash: TreeHash3;
+  manifest_artifact_id: ManifestArtifactId3;
+  manifest_hash: ManifestHash3;
+  profile_version: ProfileVersion4;
+  profile_hash: ProfileHash4;
+  acceptance_suite_hash: AcceptanceSuiteHash4;
+  template_hash: TemplateHash4;
+  id: Id10;
+  status: Status5;
+  qa_cycle_id: QaCycleId1;
+  qa_report_artifact_id: QaReportArtifactId;
+  qa_report_hash: QaReportHash;
+  build_tool_run_id: BuildToolRunId;
+  build_report_hash: BuildReportHash;
+  package_generation: PackageGeneration;
+  package_manifest_hash?: PackageManifestHash;
+  package_manifest_byte_size?: PackageManifestByteSize;
+  package_tree_hash?: PackageTreeHash;
+  package_archive_hash?: PackageArchiveHash;
+  package_archive_byte_size?: PackageArchiveByteSize;
+  package_payload_byte_size?: PackagePayloadByteSize;
+  package_file_count?: PackageFileCount;
+  smoke_tool_run_id?: SmokeToolRunId;
+  smoke_report_artifact_id?: SmokeReportArtifactId;
+  deployment_package_artifact_id?: DeploymentPackageArtifactId;
+  runbook_artifact_id?: RunbookArtifactId;
+  blocked_reason?: BlockedReason4;
+  created_at: CreatedAt9;
+  updated_at: UpdatedAt1;
+  finished_at?: FinishedAt4;
+}
+export interface PreviewSessionView {
+  id: Id11;
+  run_id: RunId9;
+  package_id: PackageId;
+  package_generation: PackageGeneration1;
+  package_tree_hash: PackageTreeHash1;
+  status: Status6;
+  version: Version3;
+  start_tool_run_id?: StartToolRunId;
+  stop_tool_run_id?: StopToolRunId;
+  error_code?: ErrorCode2;
+  error_message?: ErrorMessage2;
+  created_at: CreatedAt10;
+  updated_at: UpdatedAt2;
+  ready_at?: ReadyAt;
+  finished_at?: FinishedAt5;
+}
 export interface EventsPage {
   events: Events;
   next_after_seq: NextAfterSeq;
@@ -735,11 +862,11 @@ export interface RunCreatedEvent {
   event_id: EventId;
   schema_version?: SchemaVersion1;
   project_id: ProjectId1;
-  run_id: RunId8;
+  run_id: RunId10;
   seq: Seq;
   occurred_at: OccurredAt;
   actor_id: ActorId;
-  task_id: TaskId4;
+  task_id: TaskId5;
   correlation_id: CorrelationId;
   causation_id: CausationId;
   event_type?: EventType;
@@ -755,11 +882,11 @@ export interface TaskQueuedEvent {
   event_id: EventId1;
   schema_version?: SchemaVersion2;
   project_id: ProjectId2;
-  run_id: RunId9;
+  run_id: RunId11;
   seq: Seq1;
   occurred_at: OccurredAt1;
   actor_id: ActorId1;
-  task_id: TaskId5;
+  task_id: TaskId6;
   correlation_id: CorrelationId1;
   causation_id: CausationId1;
   event_type?: EventType1;
@@ -772,11 +899,11 @@ export interface RunPausedEvent {
   event_id: EventId2;
   schema_version?: SchemaVersion3;
   project_id: ProjectId3;
-  run_id: RunId10;
+  run_id: RunId12;
   seq: Seq2;
   occurred_at: OccurredAt2;
   actor_id: ActorId2;
-  task_id: TaskId6;
+  task_id: TaskId7;
   correlation_id: CorrelationId2;
   causation_id: CausationId2;
   event_type?: EventType2;
@@ -791,11 +918,11 @@ export interface RunPausingEvent {
   event_id: EventId3;
   schema_version?: SchemaVersion4;
   project_id: ProjectId4;
-  run_id: RunId11;
+  run_id: RunId13;
   seq: Seq3;
   occurred_at: OccurredAt3;
   actor_id: ActorId3;
-  task_id: TaskId7;
+  task_id: TaskId8;
   correlation_id: CorrelationId3;
   causation_id: CausationId3;
   event_type?: EventType3;
@@ -805,11 +932,11 @@ export interface RunResumedEvent {
   event_id: EventId4;
   schema_version?: SchemaVersion5;
   project_id: ProjectId5;
-  run_id: RunId12;
+  run_id: RunId14;
   seq: Seq4;
   occurred_at: OccurredAt4;
   actor_id: ActorId4;
-  task_id: TaskId8;
+  task_id: TaskId9;
   correlation_id: CorrelationId4;
   causation_id: CausationId4;
   event_type?: EventType4;
@@ -819,11 +946,11 @@ export interface RunCancelledEvent {
   event_id: EventId5;
   schema_version?: SchemaVersion6;
   project_id: ProjectId6;
-  run_id: RunId13;
+  run_id: RunId15;
   seq: Seq5;
   occurred_at: OccurredAt5;
   actor_id: ActorId5;
-  task_id: TaskId9;
+  task_id: TaskId10;
   correlation_id: CorrelationId5;
   causation_id: CausationId5;
   event_type?: EventType5;
@@ -833,11 +960,11 @@ export interface WorkflowUpdatedEvent {
   event_id: EventId6;
   schema_version?: SchemaVersion7;
   project_id: ProjectId7;
-  run_id: RunId14;
+  run_id: RunId16;
   seq: Seq6;
   occurred_at: OccurredAt6;
   actor_id: ActorId6;
-  task_id: TaskId10;
+  task_id: TaskId11;
   correlation_id: CorrelationId6;
   causation_id: CausationId6;
   event_type?: EventType6;
@@ -855,6 +982,8 @@ export interface WorkflowUpdatedPayload {
   candidate?: CandidateView | null;
   tool_runs?: ToolRuns1;
   quality_cycles?: QualityCycles1;
+  delivery?: DeliveryView | null;
+  preview_sessions?: PreviewSessions1;
 }
 export interface CapabilitiesResponse {
   stage?: Stage;
@@ -862,8 +991,8 @@ export interface CapabilitiesResponse {
   roles: Roles;
 }
 export interface Capability {
-  id: Id10;
-  status: Status5;
+  id: Id12;
+  status: Status7;
   reason: Reason;
 }
 export interface RoleDefinition {
@@ -888,10 +1017,10 @@ export interface CommandReceiptView {
   key: Key;
   params_hash: ParamsHash;
   response: Response;
-  created_at: CreatedAt9;
+  created_at: CreatedAt11;
 }
 export interface DecisionResolution {
-  version: Version3;
+  version: Version4;
   choice: Choice1;
   comment?: Comment1;
 }
@@ -932,37 +1061,7 @@ export interface ToolCommand {
   output_limit_bytes?: OutputLimitBytes1;
 }
 export interface TestReport {
-  run_id: RunId15;
-  task_id: TaskId11;
-  candidate_id: CandidateId1;
-  revision: Revision2;
-  tree_hash: TreeHash3;
-  manifest_artifact_id: ManifestArtifactId3;
-  manifest_hash: ManifestHash3;
-  profile_version: ProfileVersion4;
-  profile_hash: ProfileHash4;
-  acceptance_suite_hash: AcceptanceSuiteHash4;
-  template_hash: TemplateHash4;
-  cycle_id: CycleId;
-  iteration: Iteration2;
-  status: Status6;
-  tool_run_ids: ToolRunIds1;
-  requirements: Requirements;
-  proposed_tests: ProposedTests;
-  resolves_bug_ids?: ResolvesBugIds;
-}
-export interface RequirementCheck {
-  requirement_id: RequirementId;
-  tool_run_ids: ToolRunIds2;
-  status: Status7;
-}
-export interface ProposedTest {
-  title: Title1;
-  requirement_ids: RequirementIds;
-  status?: Status8;
-}
-export interface Bug {
-  run_id: RunId16;
+  run_id: RunId17;
   task_id: TaskId12;
   candidate_id: CandidateId2;
   revision: Revision3;
@@ -973,12 +1072,64 @@ export interface Bug {
   profile_hash: ProfileHash5;
   acceptance_suite_hash: AcceptanceSuiteHash5;
   template_hash: TemplateHash5;
+  cycle_id: CycleId;
+  iteration: Iteration2;
+  status: Status8;
+  tool_run_ids: ToolRunIds1;
+  requirements: Requirements;
+  proposed_tests: ProposedTests;
+  resolves_bug_ids?: ResolvesBugIds;
+}
+export interface RequirementCheck {
+  requirement_id: RequirementId;
+  tool_run_ids: ToolRunIds2;
+  status: Status9;
+}
+export interface ProposedTest {
+  title: Title1;
+  requirement_ids: RequirementIds;
+  status?: Status10;
+}
+export interface Bug {
+  run_id: RunId18;
+  task_id: TaskId13;
+  candidate_id: CandidateId3;
+  revision: Revision4;
+  tree_hash: TreeHash5;
+  manifest_artifact_id: ManifestArtifactId5;
+  manifest_hash: ManifestHash5;
+  profile_version: ProfileVersion6;
+  profile_hash: ProfileHash6;
+  acceptance_suite_hash: AcceptanceSuiteHash6;
+  template_hash: TemplateHash6;
   cycle_id: CycleId1;
   iteration: Iteration3;
-  status?: Status9;
+  status?: Status11;
   tool_run_ids: ToolRunIds3;
   requirement_ids: RequirementIds1;
   summary: Summary1;
+}
+export interface PreviewCommand {
+  command: Command1;
+  package_id: PackageId1;
+  preview_session_id?: PreviewSessionId1;
+  expected_version: ExpectedVersion;
+}
+export interface PreviewView {
+  run_id: RunId19;
+  delivery?: DeliveryView | null;
+  preview_sessions?: PreviewSessions2;
+  access: PreviewAccess;
+}
+export interface PreviewAccess {
+  run_id: RunId20;
+  status: Status12;
+  package_id?: PackageId2;
+  preview_session_id?: PreviewSessionId2;
+  version?: Version5;
+  origin?: Origin2;
+  reason?: Reason1;
+  health_checked_at?: HealthCheckedAt;
 }
 
 export type DomainEvent = EventsPage['events'][number];

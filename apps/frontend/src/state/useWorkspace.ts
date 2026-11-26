@@ -3,6 +3,7 @@ import type { CapabilitiesResponse, CreateProject, DecisionResolution, DecisionV
 import { api, ApiError, errorMessage } from '../app/api';
 import { readSelection, saveSelection, type Selection } from './selection';
 import { mergeRunHistory } from './runHistory';
+import { hasCandidateWorkflow } from './workflowVersions';
 
 interface AcceptedTool {
   runId: string;
@@ -195,7 +196,7 @@ export function useWorkspace() {
     const runId = selectionRef.current.runId;
     const candidate = snapshot.candidate;
     if (pendingRef.current || runId !== snapshot.run.id || !candidate || candidate.run_id !== runId
-      || candidate.status !== 'ready' || snapshot.run.mode !== 'test' || !['clinic-v2', 'clinic-v3'].includes(snapshot.run.workflow_version)
+      || candidate.status !== 'ready' || snapshot.run.mode !== 'test' || !hasCandidateWorkflow(snapshot.run.workflow_version)
       || snapshot.run.pause_requested || snapshot.run.cancel_requested || ['paused', 'pausing', 'cancelled', 'failed', 'succeeded'].includes(snapshot.run.status)
       || command.workspace_id !== candidate.id || command.snapshot_version !== candidate.revision) return false;
     observeToolSnapshot(snapshot);

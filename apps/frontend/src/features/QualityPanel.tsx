@@ -1,20 +1,22 @@
 import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
-import type { ArtifactView, QualityCycleView, Snapshot } from '../../../../packages/contracts';
+import type { ArtifactView, QualityCycleView, Snapshot, ToolRunView } from '../../../../packages/contracts';
 import { requirementLabels, type QualityDocument } from '../state/qualityContent';
 import { useBugResolution, useQualityDocument } from '../state/useQualityDocument';
 import { formatTime } from './roles';
 import { testScenarioLabels } from './RunPanel';
+import { hasQualityWorkflow } from '../state/workflowVersions';
 interface Props { snapshot: Snapshot | null; onSelectArtifact: (id: string) => void; onSelectTool: (id: string) => void; onSelectTask: (id: string) => void }
 const cycleLabels: Record<QualityCycleView['status'], string> = { created: 'В очереди', testing: 'Проверки выполняются', analyzing: 'QA анализирует',
   passed: 'Проверки пройдены', failed: 'Проверки не пройдены', blocked: 'Проверка заблокирована', cancelled: 'Отменено' };
-const operationLabels = { validate_backend: 'Python', test_backend: 'HTTP', build_frontend: 'Сборка интерфейса' };
+const operationLabels: Record<ToolRunView['operation_id'], string> = { validate_backend: 'Python', test_backend: 'HTTP', build_frontend: 'Сборка интерфейса',
+  smoke_test: 'Smoke-проверка', start_preview: 'Запуск preview', stop_preview: 'Остановка preview' };
 const checkLabels = { passed: 'Пройдено', failed: 'Не пройдено', not_verified: 'Не проверено' };
 const toolLabels = { created: 'В очереди', running: 'Выполняется', succeeded: 'Пройдено', failed: 'Ошибка', cancelled: 'Отменено', uncertain: 'Исход неизвестен', timed_out: 'Таймаут' };
 export function QualityPanel({ snapshot, ...callbacks }: Props) {
   const cycles = [...(snapshot?.quality_cycles ?? [])].sort((left, right) => left.iteration - right.iteration);
   if (!snapshot || !cycles.length) return <div className="empty-state"><div><h3>QA-циклов пока нет</h3>
-    <p>{snapshot && snapshot.run.workflow_version !== 'clinic-v3' ? 'Эта версия процесса не выполняет QA автоматически. Результаты ручных проверок сохранены во вкладке «Проверки».'
+    <p>{snapshot && !hasQualityWorkflow(snapshot.run.workflow_version) ? 'Эта версия процесса не выполняет QA автоматически. Результаты ручных проверок сохранены во вкладке «Проверки».'
       : 'После сохранения кандидата worker запустит Python, HTTP и сборку, затем QA составит отчёт по фактическим результатам.'}</p></div></div>;
   const latest = cycles[cycles.length - 1];
   return <section className="quality-panel" aria-label="Качество кандидата" data-run-id={snapshot.run.id}>

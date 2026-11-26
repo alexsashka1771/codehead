@@ -1,4 +1,5 @@
 import { CirclePause, FlaskConical, Pause, Play, Square, Unplug } from 'lucide-react';
+import { hasQualityWorkflow } from '../state/workflowVersions';
 import type { RunCommand, RunView, Snapshot, StartRun, UsageSummary } from '../../../../packages/contracts';
 import { formatTime, runLabels, terminalStatuses } from './roles';
 
@@ -45,13 +46,14 @@ export function RunPanel({ run, runs, snapshot, loading, pending, hasProject, co
         {canResume ? <button className="button secondary" type="button" disabled={Boolean(pending) || !connected} onClick={() => onCommand('resume')}><Play size={15} />Продолжить</button> : null}
         {canCancel ? <button className="button text danger" type="button" disabled={Boolean(pending) || !connected} onClick={() => onCommand('cancel')}><Square size={13} />Отменить запуск</button> : null}
       </div>
-      <p className="execution-note">{test ? currentRun?.workflow_version === 'clinic-v3'
-        ? 'Тестовый источник: роли используют заглушку, без внешних LLM-вызовов. PM → Architect → CTO → Backend + Frontend → реальные проверки Python, HTTP и сборка → QA → до двух исправлений. Preview пока недоступен.'
+      <p className="execution-note">{test ? hasQualityWorkflow(currentRun?.workflow_version)
+        ? 'Тестовый источник. PM → Architect → CTO → Backend + Frontend → реальные проверки Python, HTTP и сборка → QA → до двух исправлений. '
+          + (currentRun?.workflow_version === 'clinic-v4' ? 'Доставка после успешного QA проходит через smoke и DevOps. Локальный preview запускается вручную.' : 'Preview пока недоступен.')
         : currentRun?.workflow_version === 'clinic-v2'
         ? 'Тестовый источник: пять ролей с заглушкой, без внешних LLM-вызовов. PM → Architect → CTO → Backend + Frontend. Проверки Runner доступны после сохранения кандидата и подключения worker. QA и preview пока недоступны.'
         : 'Тестовый источник: детерминированные документы, без внешних LLM-вызовов. PM → Architect → CTO.'
         : 'Live-генерация пока недоступна: провайдер не подключён. Тест запускается отдельной кнопкой.'}{!testAvailable ? ' ' + (testReason ?? 'Тестовый worker сейчас недоступен.') : ''}</p>
-      {test && currentRun?.workflow_version === 'clinic-v3' ? <p className="field-hint">Сценарий запуска: {testScenarioLabels[currentRun.test_scenario ?? 'standard']}.{currentRun.injection_done ? ' Доверенная тестовая инъекция сохранена в истории кандидата.' : ''}</p> : null}
+      {test && currentRun && hasQualityWorkflow(currentRun.workflow_version) ? <p className="field-hint">Сценарий запуска: {testScenarioLabels[currentRun.test_scenario ?? 'standard']}.{currentRun.injection_done ? ' Доверенная тестовая инъекция сохранена в истории кандидата.' : ''}</p> : null}
       <details className="run-limits"><summary>Лимиты запуска</summary><dl><div><dt>Параллельные задачи</dt><dd>{currentRun?.limits.max_parallel_tasks ?? 2}</dd></div><div><dt>Циклы исправления</dt><dd>{currentRun?.limits.max_repair_iterations ?? 2}</dd></div><div><dt>Вызовы LLM</dt><dd>{currentRun?.limits.max_llm_calls ?? 64}</dd></div><div><dt>Время</dt><dd>{Math.round((currentRun?.limits.max_duration_seconds ?? 1800) / 60)} мин</dd></div><div><dt>Бюджет</dt><dd>{currentRun?.limits.max_cost_usd != null ? `$${currentRun.limits.max_cost_usd}` : 'Не задан'}</dd></div></dl></details>
     </section>
     <section className="usage-panel" aria-labelledby="usage-title"><div className="section-title"><h2 id="usage-title">Использование LLM</h2><span className="quiet-label">{usage?.source === 'test' ? 'Тестовый источник' : usage?.source === 'live' ? 'Live' : 'Неизвестно'}</span></div><dl className="usage-metrics"><div><dt>Запросы</dt><dd>{usage?.request_count ?? '—'}</dd></div><div><dt>Токены</dt><dd>{tokenTotal?.toLocaleString('ru-RU') ?? '—'}</dd></div><div><dt>Стоимость</dt><dd>{usage?.cost_usd != null ? `$${usage.cost_usd.toFixed(4)}` : '—'}</dd></div></dl><p className="field-hint">{usage?.model ? `${usage.provider ?? ''} · ${usage.model}` : 'Модель, токены и стоимость пока неизвестны.'}{usage?.source === 'test' ? ' Внешние токены и стоимость теста равны нулю.' : ''}</p></section>

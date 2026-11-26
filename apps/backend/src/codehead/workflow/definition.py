@@ -1,8 +1,9 @@
-"""The bounded coursework workflow; execution belongs to a future worker."""
+"""Role definitions and compatibility versions for the Clinic Demo workflow."""
 
-from codehead.contracts import Location, Role, RoleDefinition
+from codehead.contracts import QUALITY_WORKFLOW_VERSIONS, Location, Role, RoleDefinition
+from codehead.contracts import WORKFLOW_VERSION as WORKFLOW_VERSION
 
-WORKFLOW_VERSION = "clinic-v3"
+CANDIDATE_WORKFLOW_VERSIONS = ("clinic-v2", *QUALITY_WORKFLOW_VERSIONS)
 ROLE_DEFINITIONS = (
     RoleDefinition(
         role=Role.PRODUCT_MANAGER,

@@ -201,6 +201,8 @@ class TestProvider:
             raise self._failure("invalid_provider_request", "Expected a ProviderRequest.")
         if request.quality_context is not None and request.role != "qa":
             raise self._failure("invalid_provider_request", "QA evidence belongs to the QA role.")
+        if request.delivery_context is not None and request.role != "devops":
+            raise self._failure("invalid_provider_request", "Delivery evidence belongs to DevOps.")
         if request.repair_context is not None and (
             request.role != "backend"
             or not isinstance(request.repair_context, dict)
@@ -215,6 +217,11 @@ class TestProvider:
             and not (self.with_files and request.role in ROLE_PATHS)
             and not (
                 self.with_files and request.role == "qa" and request.quality_context is not None
+            )
+            and not (
+                self.with_files
+                and request.role == "devops"
+                and request.delivery_context is not None
             )
         ):
             raise self._failure(
@@ -252,6 +259,8 @@ class TestProvider:
         required = _REQUIRED_INPUTS.get(
             request.role, {"requirements", "architecture", "api_contract", "decision"}
         )
+        if request.role == "devops":
+            required = {"candidate_manifest", "test_report", "tool_report", "smoke_report"}
         missing = required - {item["artifact_type"] for item in inputs}
         if missing:
             raise self._failure(
@@ -271,6 +280,7 @@ class TestProvider:
             acceptance_suite_hash=request.acceptance_suite_hash,
             quality_context=request.quality_context,
             repair_context=request.repair_context,
+            delivery_context=request.delivery_context,
         )
         if clean.role in ROLE_PATHS:
             clean = replace(clean, candidate_files=clean_file_bases(clean))
@@ -278,6 +288,10 @@ class TestProvider:
             from codehead.llm.quality_provider import evidence_status
 
             evidence_status(clean.quality_context)
+        if clean.role == "devops":
+            from codehead.llm.delivery_provider import validate_inputs
+
+            validate_inputs(clean)
         return clean
 
     def _prompt(self, request: ProviderRequest) -> str:
@@ -292,6 +306,8 @@ class TestProvider:
             "mode": "test",
             "instructions_version": "worker-test-qa-v1"
             if request.role == "qa"
+            else "worker-test-devops-v1"
+            if request.role == "devops"
             else "clinic-files-v1"
             if request.role in ROLE_PATHS
             else "clinic-document-v1",
@@ -319,6 +335,10 @@ class TestProvider:
             from codehead.llm.quality_provider import drafts
 
             artifacts, summary = drafts(clean.quality_context)
+        elif clean.role == "devops":
+            from codehead.llm.delivery_provider import drafts
+
+            artifacts, summary = drafts(clean)
         else:
             artifacts, summary = _DOCUMENT_FACTORIES[clean.role](clean)
         artifacts = tuple(

@@ -1085,6 +1085,9 @@
             },
             {
               "$ref": "#/$defs/ToolRunView"
+            },
+            {
+              "$ref": "#/$defs/PreviewSessionView"
             }
           ],
           "title": "Response"
@@ -1324,6 +1327,305 @@
       "title": "DecisionView",
       "type": "object"
     },
+    "DeliveryView": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "tree_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Tree Hash",
+          "type": "string"
+        },
+        "manifest_artifact_id": {
+          "title": "Manifest Artifact Id",
+          "type": "string"
+        },
+        "manifest_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Manifest Hash",
+          "type": "string"
+        },
+        "profile_version": {
+          "title": "Profile Version",
+          "type": "string"
+        },
+        "profile_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Profile Hash",
+          "type": "string"
+        },
+        "acceptance_suite_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Acceptance Suite Hash",
+          "type": "string"
+        },
+        "template_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Template Hash",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "created",
+            "publishing",
+            "smoking",
+            "analyzing",
+            "ready",
+            "failed",
+            "blocked",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "qa_cycle_id": {
+          "title": "Qa Cycle Id",
+          "type": "string"
+        },
+        "qa_report_artifact_id": {
+          "title": "Qa Report Artifact Id",
+          "type": "string"
+        },
+        "qa_report_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Qa Report Hash",
+          "type": "string"
+        },
+        "build_tool_run_id": {
+          "title": "Build Tool Run Id",
+          "type": "string"
+        },
+        "build_report_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Build Report Hash",
+          "type": "string"
+        },
+        "package_generation": {
+          "minimum": 0,
+          "title": "Package Generation",
+          "type": "integer"
+        },
+        "package_manifest_hash": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package Manifest Hash"
+        },
+        "package_manifest_byte_size": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package Manifest Byte Size"
+        },
+        "package_tree_hash": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package Tree Hash"
+        },
+        "package_archive_hash": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package Archive Hash"
+        },
+        "package_archive_byte_size": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package Archive Byte Size"
+        },
+        "package_payload_byte_size": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package Payload Byte Size"
+        },
+        "package_file_count": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package File Count"
+        },
+        "smoke_tool_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Smoke Tool Run Id"
+        },
+        "smoke_report_artifact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Smoke Report Artifact Id"
+        },
+        "deployment_package_artifact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deployment Package Artifact Id"
+        },
+        "runbook_artifact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runbook Artifact Id"
+        },
+        "blocked_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Blocked Reason"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        }
+      },
+      "required": [
+        "run_id",
+        "task_id",
+        "candidate_id",
+        "revision",
+        "tree_hash",
+        "manifest_artifact_id",
+        "manifest_hash",
+        "profile_version",
+        "profile_hash",
+        "acceptance_suite_hash",
+        "template_hash",
+        "id",
+        "status",
+        "qa_cycle_id",
+        "qa_report_artifact_id",
+        "qa_report_hash",
+        "build_tool_run_id",
+        "build_report_hash",
+        "package_generation",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "DeliveryView",
+      "type": "object"
+    },
     "EventsPage": {
       "additionalProperties": false,
       "properties": {
@@ -1444,6 +1746,326 @@
       ],
       "title": "Location",
       "type": "string"
+    },
+    "PreviewAccess": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "available",
+            "unavailable"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "package_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package Id"
+        },
+        "preview_session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preview Session Id"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "pattern": "^http://127\\.0\\.0\\.1:[1-9][0-9]{0,4}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Origin"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "health_checked_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Health Checked At"
+        }
+      },
+      "required": [
+        "run_id",
+        "status"
+      ],
+      "title": "PreviewAccess",
+      "type": "object"
+    },
+    "PreviewCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "enum": [
+            "start",
+            "stop"
+          ],
+          "title": "Command",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "preview_session_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preview Session Id"
+        },
+        "expected_version": {
+          "minimum": 0,
+          "title": "Expected Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command",
+        "package_id",
+        "expected_version"
+      ],
+      "title": "PreviewCommand",
+      "type": "object"
+    },
+    "PreviewSessionView": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "package_id": {
+          "title": "Package Id",
+          "type": "string"
+        },
+        "package_generation": {
+          "minimum": 1,
+          "title": "Package Generation",
+          "type": "integer"
+        },
+        "package_tree_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Package Tree Hash",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "created",
+            "starting",
+            "ready",
+            "stopping",
+            "stopped",
+            "failed",
+            "uncertain"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "start_tool_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Tool Run Id"
+        },
+        "stop_tool_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop Tool Run Id"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Code"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Message"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "ready_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ready At"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        }
+      },
+      "required": [
+        "id",
+        "run_id",
+        "package_id",
+        "package_generation",
+        "package_tree_hash",
+        "status",
+        "version",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "PreviewSessionView",
+      "type": "object"
+    },
+    "PreviewView": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "delivery": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeliveryView"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "preview_sessions": {
+          "items": {
+            "$ref": "#/$defs/PreviewSessionView"
+          },
+          "title": "Preview Sessions",
+          "type": "array"
+        },
+        "access": {
+          "$ref": "#/$defs/PreviewAccess"
+        }
+      },
+      "required": [
+        "run_id",
+        "access"
+      ],
+      "title": "PreviewView",
+      "type": "object"
     },
     "ProjectView": {
       "additionalProperties": false,
@@ -2722,6 +3344,24 @@
           },
           "title": "Quality Cycles",
           "type": "array"
+        },
+        "delivery": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeliveryView"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "preview_sessions": {
+          "items": {
+            "$ref": "#/$defs/PreviewSessionView"
+          },
+          "title": "Preview Sessions",
+          "type": "array"
         }
       },
       "required": [
@@ -2751,10 +3391,11 @@
           "$ref": "#/$defs/RunLimits"
         },
         "workflow_version": {
-          "default": "clinic-v3",
+          "default": "clinic-v4",
           "enum": [
             "clinic-v2",
-            "clinic-v3"
+            "clinic-v3",
+            "clinic-v4"
           ],
           "title": "Workflow Version",
           "type": "string"
@@ -3203,7 +3844,10 @@
           "enum": [
             "validate_backend",
             "test_backend",
-            "build_frontend"
+            "build_frontend",
+            "smoke_test",
+            "start_preview",
+            "stop_preview"
           ],
           "title": "Operation Id",
           "type": "string"
@@ -3451,6 +4095,30 @@
           ],
           "default": null,
           "title": "Qa Cycle Id"
+        },
+        "delivery_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Delivery Id"
+        },
+        "preview_session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preview Session Id"
         }
       },
       "required": [
@@ -3747,6 +4415,24 @@
           },
           "title": "Quality Cycles",
           "type": "array"
+        },
+        "delivery": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DeliveryView"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "preview_sessions": {
+          "items": {
+            "$ref": "#/$defs/PreviewSessionView"
+          },
+          "title": "Preview Sessions",
+          "type": "array"
         }
       },
       "required": [
@@ -3815,6 +4501,12 @@
     },
     "bug": {
       "$ref": "#/$defs/Bug"
+    },
+    "preview_command": {
+      "$ref": "#/$defs/PreviewCommand"
+    },
+    "preview": {
+      "$ref": "#/$defs/PreviewView"
     }
   },
   "required": [
@@ -3834,7 +4526,9 @@
     "file_proposal",
     "tool_command",
     "test_report",
-    "bug"
+    "bug",
+    "preview_command",
+    "preview"
   ],
   "title": "ContractBundle",
   "type": "object"

@@ -3,6 +3,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Query, Request
+from fastapi.responses import Response
 from sqlalchemy.exc import OperationalError
 
 from codehead.api.parameters import ResourceId
@@ -18,6 +19,9 @@ from codehead.contracts import (
     DecisionResolution,
     DecisionView,
     EventsPage,
+    PreviewCommand,
+    PreviewSessionView,
+    PreviewView,
     ProjectView,
     RunCommand,
     RunView,
@@ -29,6 +33,7 @@ from codehead.contracts import (
     UsageSummary,
 )
 from codehead.errors import DomainError
+from codehead.persistence.delivery import RUNTIME_TOOLS
 from codehead.persistence.service import ProjectService
 from codehead.persistence.tools import SUPPORTED_TOOLS
 from codehead.workflow.definition import ROLE_DEFINITIONS
@@ -112,6 +117,20 @@ def capabilities(request: Request):
         required_tools=SUPPORTED_TOOLS,
         require_single=True,
     )
+    delivery = ready and worker_ready(
+        request,
+        required_roles=(
+            "product_manager",
+            "architect",
+            "cto",
+            "backend",
+            "frontend",
+            "qa",
+            "devops",
+        ),
+        required_tools=(*SUPPORTED_TOOLS, *RUNTIME_TOOLS),
+        require_single=True,
+    )
     return CapabilitiesResponse(
         stage="worker" if connected else "foundation",
         roles=list(ROLE_DEFINITIONS),
@@ -149,17 +168,23 @@ def capabilities(request: Request):
             Capability(
                 id="qa_execution",
                 status="available" if quality else "disabled",
-                reason=(
-                    "Clinic v3 после пяти test-ролей выполняет три проверки, QA и до двух repair. "
-                    "DevOps/preview ещё не подключены."
-                )
+                reason=("Clinic после пяти test-ролей выполняет три проверки, QA и до двух repair.")
                 if quality
                 else "Для QA нужен worker с шестью test-ролями и тремя инструментами.",
             ),
             Capability(
+                id="delivery",
+                status="available" if delivery else "disabled",
+                reason="Clinic v4 публикует пакет после QA, smoke и DevOps."
+                if delivery
+                else "Для подготовки пакета нужен worker Clinic v4.",
+            ),
+            Capability(
                 id="preview",
-                status="planned",
-                reason="Публичный запуск кандидата и preview ещё не подключены.",
+                status="available" if delivery else "disabled",
+                reason="Проверенный Clinic Demo запускается локально по команде."
+                if delivery
+                else "Для локального preview нужен worker Clinic v4.",
             ),
             Capability(
                 id="live_generation",
@@ -171,13 +196,10 @@ def capabilities(request: Request):
                 status="available" if runner else "disabled",
                 reason=(
                     "Ручные validate_backend, test_backend и build_frontend "
-                    "для тестового кандидата; process_only. Preview ещё не подключён."
+                    "для тестового кандидата, изоляция process_only."
                 )
                 if runner
-                else (
-                    "Worker с validate_backend, test_backend и build_frontend не подключён; "
-                    "preview ещё не подключён."
-                ),
+                else ("Worker с validate_backend, test_backend и build_frontend не подключён."),
             ),
             Capability(
                 id="replay",
@@ -290,6 +312,38 @@ def candidate(run_id: ResourceId, service: Service):
 @router.get("/api/runs/{run_id}/tools", response_model=list[ToolRunView])
 def tool_runs(run_id: ResourceId, service: Service):
     return service.tool_runs(run_id)
+
+
+@router.get("/api/runs/{run_id}/preview", response_model=PreviewView)
+def preview(run_id: ResourceId, service: Service):
+    return service.preview(run_id)
+
+
+@router.post(
+    "/api/runs/{run_id}/preview/commands", response_model=PreviewSessionView, status_code=202
+)
+def preview_command(
+    run_id: ResourceId,
+    command: PreviewCommand,
+    request: Request,
+    service: Service,
+    idempotency_key: CommandKey,
+):
+    return service.preview_command(run_id, command, idempotency_key, request.state.correlation_id)
+
+
+@router.get("/api/runs/{run_id}/delivery/{package_id}/archive", response_class=Response)
+def delivery_archive(run_id: ResourceId, package_id: ResourceId, service: Service):
+    delivery, content = service.delivery_archive(run_id, package_id)
+    return Response(
+        content,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="clinic-{delivery.id}.zip"',
+            "ETag": f'"{delivery.package_archive_hash}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.post("/api/runs/{run_id}/tools/commands", response_model=ToolRunView, status_code=202)

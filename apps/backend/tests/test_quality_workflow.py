@@ -53,7 +53,16 @@ class KnownRunner:
         )
 
 
-def setup_run(database, tmp_path, scenario="standard", failed=0, repairs=2, llm_calls=64):
+def setup_run(
+    database,
+    tmp_path,
+    scenario="standard",
+    failed=0,
+    repairs=2,
+    llm_calls=64,
+    *,
+    workflow_version="clinic-v3",
+):
     service = ProjectService(database)
     project = service.create_project(
         CreateProject(name="Quality clinic", description="Synthetic clinic appointments."),
@@ -63,6 +72,7 @@ def setup_run(database, tmp_path, scenario="standard", failed=0, repairs=2, llm_
         project.id,
         StartRun(
             mode="test",
+            workflow_version=workflow_version,
             test_scenario=scenario,
             limits=RunLimits(max_repair_iterations=repairs, max_llm_calls=llm_calls),
         ),
@@ -97,9 +107,9 @@ def drain(service, run, worker):
     pytest.fail("QA workflow did not settle")
 
 
-def test_start_default_v3_and_old_default_digest():
+def test_start_default_v4_and_old_default_digest():
     command = StartRun(mode="test")
-    assert command.workflow_version == "clinic-v3"
+    assert command.workflow_version == "clinic-v4"
     assert command.test_scenario == "standard"
     import hashlib
 
@@ -116,10 +126,32 @@ def test_start_default_v3_and_old_default_digest():
     )
 
 
-@pytest.mark.parametrize("mode,version", [("live", "clinic-v3"), ("test", "clinic-v2")])
+@pytest.mark.parametrize(
+    "mode,version", [("live", "clinic-v3"), ("live", "clinic-v4"), ("test", "clinic-v2")]
+)
 def test_nonstandard_scenario_rejected(mode, version):
     with pytest.raises(ValueError):
         StartRun(mode=mode, workflow_version=version, test_scenario="repair_success")
+
+
+@pytest.mark.parametrize("version", ["clinic-v3", "clinic-v4"])
+@pytest.mark.parametrize("scenario", ["repair_success", "repair_blocked"])
+def test_test_qa_versions_accept_repair_scenarios(version, scenario):
+    assert StartRun(
+        mode="test", workflow_version=version, test_scenario=scenario
+    ).test_scenario == (scenario)
+
+
+@pytest.mark.parametrize("scenario,failed,revision", [("standard", 0, 3), ("repair_success", 1, 5)])
+def test_clinic_v4_uses_pinned_qa_tools_and_repair(database, tmp_path, scenario, failed, revision):
+    service, run, _, worker = setup_run(
+        database, tmp_path, scenario, failed, workflow_version="clinic-v4"
+    )
+    snapshot = drain(service, run, worker)
+    assert snapshot.candidate.revision == revision
+    assert len(snapshot.quality_cycles) == failed + 1
+    assert [cycle.status for cycle in snapshot.quality_cycles] == ["failed"] * failed + ["passed"]
+    assert len([tool for tool in snapshot.tool_runs if tool.qa_cycle_id]) == 3 * (failed + 1)
 
 
 @pytest.mark.parametrize(

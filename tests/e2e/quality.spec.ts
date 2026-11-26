@@ -18,7 +18,7 @@ async function createQualityRun(request: APIRequestContext, scenario: 'standard'
     data: { name: 'QA clinic ' + randomUUID().slice(0, 6), description: 'Синтетические данные для реальной QA и ограниченного исправления.' } });
   expect(created.status()).toBe(201); const project: ProjectView = await created.json();
   const started = await request.post(`/api/projects/${project.id}/runs`, { headers: { ...headers, 'Idempotency-Key': randomUUID() },
-    data: { mode: 'test', test_scenario: scenario } });
+    data: { mode: 'test', workflow_version: 'clinic-v3', test_scenario: scenario } });
   expect(started.status()).toBe(201); const run: RunView = await started.json();
   expect(run).toMatchObject({ workflow_version: 'clinic-v3', test_scenario: scenario, injection_done: false });
   await expect.poll(async () => (await snapshot(request, run.id)).decisions?.find(d => d.kind === 'architecture_approval' && d.status === 'open')?.id,
@@ -124,7 +124,7 @@ test('preserves real repair history, immutable evidence, report sources and task
   await expect(panel.locator('.quality-cycle')).toHaveCount(2);
 });
 
-test('offers default v3 scenarios and keyboard QA evidence at 430px with HTML fallback', async ({ page, request }, testInfo) => {
+test('offers test scenarios and keeps historical v3 QA accessible by keyboard at 430px', async ({ page, request }, testInfo) => {
   test.setTimeout(480_000);
   await page.setViewportSize({ width: 430, height: 932 });
   await page.addInitScript(() => { const original = HTMLCanvasElement.prototype.getContext;

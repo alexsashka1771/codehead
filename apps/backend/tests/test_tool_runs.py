@@ -228,7 +228,8 @@ def test_capability_requires_all_registered_tools_and_unions_worker_support(clie
         )
     assert capability()["status"] == "available"
     assert "process_only" in capability()["reason"]
-    assert "preview" in capability()["reason"].lower()
+    by_id = {item["id"]: item for item in client.get("/api/capabilities").json()["capabilities"]}
+    assert by_id["preview"]["status"] == by_id["delivery"]["status"] == "disabled"
 
 
 def test_queue_rejects_run_without_candidate(database):

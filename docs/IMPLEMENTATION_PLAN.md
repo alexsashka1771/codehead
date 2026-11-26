@@ -1,8 +1,14 @@
-# План реализации: QA и repair, подэтап 4.2
+# План реализации CodeHead
+
+## DevOps и preview, подэтап 4.3
+
+`clinic-v4` связывает успешный QA с закреплённым ZIP, smoke на свежей SQLite, документами DevOps и завершением запуска. Preview запускается отдельной командой через worker и открывается из инспектора после подтверждения доступности. Состояние и команды описаны в [PREVIEW_DESIGN](PREVIEW_DESIGN.md), проверки и порядок исполнения — в [PREVIEW_PLAN](PREVIEW_PLAN.md), результаты — в [PREVIEW_REPORT](PREVIEW_REPORT.md).
+
+## История: QA и repair, подэтап 4.2
 
 25 ноября 2026 подэтап 4.2 проверен по [QA_DESIGN](QA_DESIGN.md) / [QA_PLAN](QA_PLAN.md) в ветке codex/qa-repair от Runner. Новый clinic-v3 автоматически выполняет три ToolRun и QA; failed gate создаёт новые Backend/QA задачи с ограничением двух repair. Standard, red→green и initial+две red подтверждены настоящим внешним suite. Интерфейс показывает последний результат, историю, TestReport/Bug, источники и repair; spec/quality reviews и визуальная правка одобрены. Проверки: backend 572, frontend 370, 23 базовых и 12 worker E2E, check/build прошли. Фактические логи и ограничения — [QA_REPORT](QA_REPORT.md). Пользовательская PostgreSQL сохранена, платные вызовы и локальная модель не подключались.
 
-Следующий подэтап 4.3 — DevOps и preview отдельного origin. Старые clinic-v1/v2 сохраняют свои границы и историю. Python/HTTP/build доступны в Runner; готовность Live и preview не объявляется.
+К концу этого подэтапа Runner поддерживал проверки Python, HTTP и frontend build. Успешные `clinic-v3` сохраняют историческую границу перед доставкой.
 
 ## История: Runner 4.1
 

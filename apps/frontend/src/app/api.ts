@@ -1,6 +1,6 @@
 import type {
   AgentRunView, ApiProblem, ArtifactContent, ArtifactView, AttemptTrace, CapabilitiesResponse,
-  CandidateView, CreateProject, DecisionResolution, DecisionView, EventsPage, ProjectView,
+  CandidateView, CreateProject, DecisionResolution, DecisionView, EventsPage, PreviewCommand, PreviewSessionView, PreviewView, ProjectView,
   RunCommand, RunView, SessionInfo, Snapshot, StartRun, ToolCommand, ToolRunView, UsageSummary,
 } from '../../../../packages/contracts';
 
@@ -61,12 +61,16 @@ async function post<T>(path: string, body: unknown, key: string): Promise<T> {
 
 export const startParameters: StartRun = {
   mode: 'live',
-  workflow_version: 'clinic-v3', test_scenario: 'standard',
+  workflow_version: 'clinic-v4', test_scenario: 'standard',
   limits: {
     max_parallel_tasks: 2, max_repair_iterations: 2, max_llm_calls: 64,
     max_tokens: null, max_cost_usd: null, max_duration_seconds: 1800,
   },
 };
+
+export function deliveryArchiveUrl(runId: string, packageId: string) {
+  return `/api/runs/${encodeURIComponent(runId)}/delivery/${encodeURIComponent(packageId)}/archive`;
+}
 
 export const api = {
   capabilities: (signal?: AbortSignal) => request<CapabilitiesResponse>('/api/capabilities', { signal }),
@@ -78,6 +82,8 @@ export const api = {
   candidate: (runId: string, signal?: AbortSignal) => request<CandidateView | null>(`/api/runs/${encodeURIComponent(runId)}/candidate`, { signal }),
   tools: (runId: string, signal?: AbortSignal) => request<ToolRunView[]>(`/api/runs/${encodeURIComponent(runId)}/tools`, { signal }),
   queueTool: (runId: string, command: ToolCommand, key: string) => post<ToolRunView>(`/api/runs/${encodeURIComponent(runId)}/tools/commands`, command, key),
+  preview: (runId: string, signal?: AbortSignal) => request<PreviewView>(`/api/runs/${encodeURIComponent(runId)}/preview`, { signal, cache: 'no-store' }),
+  commandPreview: (runId: string, command: PreviewCommand, key: string) => post<PreviewSessionView>(`/api/runs/${encodeURIComponent(runId)}/preview/commands`, command, key),
   artifacts: (runId: string, signal?: AbortSignal) => request<ArtifactView[]>(`/api/runs/${encodeURIComponent(runId)}/artifacts`, { signal }),
   events: (runId: string, after: number, signal?: AbortSignal) => request<EventsPage>(`/api/runs/${encodeURIComponent(runId)}/events?after_seq=${after}&limit=100`, { signal }),
   command: (runId: string, command: RunCommand['command'], key: string) => post<RunView>(`/api/runs/${encodeURIComponent(runId)}/commands`, { command }, key),

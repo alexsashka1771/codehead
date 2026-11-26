@@ -6,7 +6,18 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
+
+WorkflowVersion = Literal["clinic-v2", "clinic-v3", "clinic-v4"]
+WORKFLOW_VERSION: WorkflowVersion = "clinic-v4"
+QUALITY_WORKFLOW_VERSIONS = ("clinic-v3", "clinic-v4")
 
 
 class Contract(BaseModel):
@@ -92,15 +103,15 @@ class ProjectView(CreateProject):
 class StartRun(Contract):
     mode: Literal["live", "test"] = "live"
     limits: RunLimits = Field(default_factory=RunLimits)
-    workflow_version: Literal["clinic-v2", "clinic-v3"] = "clinic-v3"
+    workflow_version: WorkflowVersion = WORKFLOW_VERSION
     test_scenario: Literal["standard", "repair_success", "repair_blocked"] = "standard"
 
     @model_validator(mode="after")
     def scenario_scope(self):
         if self.test_scenario != "standard" and (
-            self.mode != "test" or self.workflow_version != "clinic-v3"
+            self.mode != "test" or self.workflow_version not in QUALITY_WORKFLOW_VERSIONS
         ):
-            raise ValueError("Repair scenarios require test clinic-v3")
+            raise ValueError("Сценарии исправления доступны в тестовых clinic-v3 и clinic-v4.")
         return self
 
 
@@ -259,11 +270,12 @@ class AgentRunView(Contract):
     trace_available: bool
 
 
-ToolOperation = Literal["validate_backend", "test_backend", "build_frontend"]
+ToolCommandOperation = Literal["validate_backend", "test_backend", "build_frontend"]
+ToolOperation = Literal[ToolCommandOperation, "smoke_test", "start_preview", "stop_preview"]
 
 
 class ToolCommand(Contract):
-    operation_id: ToolOperation
+    operation_id: ToolCommandOperation
     workspace_id: str = Field(
         pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
     )
@@ -277,6 +289,7 @@ class ToolRunView(ToolCommand):
     model_config = ConfigDict(extra="forbid", from_attributes=True, str_strip_whitespace=False)
     id: str
     run_id: str
+    operation_id: ToolOperation
     status: Literal[
         "created", "running", "succeeded", "failed", "timed_out", "cancelled", "uncertain"
     ]
@@ -303,6 +316,8 @@ class ToolRunView(ToolCommand):
     lease_owner: str | None = None
     lease_expires_at: datetime | None = None
     qa_cycle_id: str | None = None
+    delivery_id: str | None = None
+    preview_session_id: str | None = None
 
     @field_validator("created_at", "started_at", "finished_at", "lease_expires_at")
     @classmethod
@@ -420,6 +435,124 @@ class Bug(QualityPins):
     summary: str = Field(min_length=1, max_length=8000)
 
 
+Digest = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+PreviewResourceId = Annotated[
+    str,
+    Field(pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"),
+]
+PreviewOrigin = Annotated[
+    str,
+    StringConstraints(strip_whitespace=False, pattern=r"^http://127\.0\.0\.1:[1-9][0-9]{0,4}$"),
+]
+
+
+class DeliveryView(QualityPins):
+    id: str
+    status: Literal[
+        "created", "publishing", "smoking", "analyzing", "ready", "failed", "blocked", "cancelled"
+    ]
+    qa_cycle_id: str
+    qa_report_artifact_id: str
+    qa_report_hash: Digest
+    build_tool_run_id: str
+    build_report_hash: Digest
+    package_generation: int = Field(ge=0)
+    package_manifest_hash: Digest | None = None
+    package_manifest_byte_size: int | None = Field(default=None, ge=1)
+    package_tree_hash: Digest | None = None
+    package_archive_hash: Digest | None = None
+    package_archive_byte_size: int | None = Field(default=None, ge=1)
+    package_payload_byte_size: int | None = Field(default=None, ge=1)
+    package_file_count: int | None = Field(default=None, ge=1)
+    smoke_tool_run_id: str | None = None
+    smoke_report_artifact_id: str | None = None
+    deployment_package_artifact_id: str | None = None
+    runbook_artifact_id: str | None = None
+    blocked_reason: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    finished_at: datetime | None = None
+
+    @field_validator("created_at", "updated_at", "finished_at")
+    @classmethod
+    def utc_timestamps(cls, value):
+        return value.astimezone(UTC) if value is not None else None
+
+
+class PreviewSessionView(Contract):
+    id: str
+    run_id: str
+    package_id: str
+    package_generation: int = Field(ge=1)
+    package_tree_hash: Digest
+    status: Literal["created", "starting", "ready", "stopping", "stopped", "failed", "uncertain"]
+    version: int = Field(ge=1)
+    start_tool_run_id: str | None = None
+    stop_tool_run_id: str | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    ready_at: datetime | None = None
+    finished_at: datetime | None = None
+
+    @field_validator("created_at", "updated_at", "ready_at", "finished_at")
+    @classmethod
+    def utc_timestamps(cls, value):
+        return value.astimezone(UTC) if value is not None else None
+
+
+class PreviewAccess(Contract):
+    run_id: str
+    status: Literal["available", "unavailable"]
+    package_id: str | None = None
+    preview_session_id: str | None = None
+    version: int | None = Field(default=None, ge=1)
+    origin: PreviewOrigin | None = None
+    reason: str | None = Field(default=None, min_length=1)
+    health_checked_at: datetime | None = None
+
+    @field_validator("health_checked_at")
+    @classmethod
+    def utc_timestamps(cls, value):
+        return value.astimezone(UTC) if value is not None else None
+
+    @model_validator(mode="after")
+    def ready_origin(self):
+        if self.status == "available":
+            if not (self.package_id and self.preview_session_id and self.version and self.origin):
+                raise ValueError("Для доступа нужны идентификаторы пакета, сессии, версия и адрес.")
+            if int(self.origin.rpartition(":")[2]) > 65535 or self.reason is not None:
+                raise ValueError("Некорректный адрес или причина для доступного preview.")
+        elif self.origin is not None or self.reason is None:
+            raise ValueError("Для недоступного preview укажите причину без адреса.")
+        return self
+
+
+class PreviewView(Contract):
+    run_id: str
+    delivery: DeliveryView | None = None
+    preview_sessions: list[PreviewSessionView] = Field(default_factory=list)
+    access: PreviewAccess
+
+
+class PreviewCommand(Contract):
+    command: Literal["start", "stop"]
+    package_id: PreviewResourceId
+    preview_session_id: PreviewResourceId | None = None
+    expected_version: int = Field(ge=0, strict=True)
+
+    @model_validator(mode="after")
+    def session_scope(self):
+        if self.command == "start" and self.preview_session_id is not None:
+            raise ValueError("Start создаёт новую сессию preview.")
+        if self.command == "stop" and (
+            self.preview_session_id is None or not self.expected_version
+        ):
+            raise ValueError("Для Stop укажите сессию preview и её версию.")
+        return self
+
+
 class Snapshot(Contract):
     schema_version: Literal[1] = 1
     project: ProjectView
@@ -434,6 +567,8 @@ class Snapshot(Contract):
     candidate: CandidateView | None = None
     tool_runs: list[ToolRunView] = Field(default_factory=list)
     quality_cycles: list[QualityCycleView] = Field(default_factory=list)
+    delivery: DeliveryView | None = None
+    preview_sessions: list[PreviewSessionView] = Field(default_factory=list)
 
 
 class EventEnvelope(Contract):
@@ -475,6 +610,8 @@ class WorkflowUpdatedPayload(RunStatePayload):
     candidate: CandidateView | None = None
     tool_runs: list[ToolRunView] = Field(default_factory=list)
     quality_cycles: list[QualityCycleView] = Field(default_factory=list)
+    delivery: DeliveryView | None = None
+    preview_sessions: list[PreviewSessionView] = Field(default_factory=list)
 
 
 class WorkflowUpdatedEvent(EventEnvelope):
@@ -583,7 +720,7 @@ class CommandReceiptView(Contract):
     scope: str
     key: str
     params_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
-    response: ProjectView | RunView | ToolRunView
+    response: ProjectView | RunView | ToolRunView | PreviewSessionView
     created_at: datetime
 
 
@@ -605,3 +742,5 @@ class ContractBundle(Contract):
     tool_command: ToolCommand
     test_report: TestReport
     bug: Bug
+    preview_command: PreviewCommand
+    preview: PreviewView

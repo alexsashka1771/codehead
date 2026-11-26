@@ -25,6 +25,7 @@ const artifactLabels: Record<string, string> = {
   requirements: 'Требования', architecture: 'Архитектура', api_contract: 'Контракт API', decision: 'Оценка CTO',
   source_code: 'Исходный код', candidate_manifest: 'Manifest кандидата',
   test_report: 'Отчёт QA · TestReport', bug: 'Дефект · Bug', tool_report: 'Результат проверки · ToolReport', test_injection: 'Доверенная тестовая инъекция',
+  deployment_package: 'Пакет DevOps', smoke_report: 'Отчёт smoke', runbook: 'Runbook',
 };
 function artifactLabel(artifact: ArtifactView) { return artifactLabels[artifact.artifact_type] ?? artifact.relative_path; }
 
@@ -131,9 +132,10 @@ export function AttemptList({ attempts, artifacts, tasks = [], onSelectArtifact,
   })}</ol>;
 }
 
-export function DecisionCard({ decision, artifacts, pending, connected, onResolve, onSelectArtifact, sourceEnabled = false, qualityEnabled = false }: {
+export function DecisionCard({ decision, artifacts, pending, connected, onResolve, onSelectArtifact, sourceEnabled = false, qualityEnabled = false, deliveryEnabled = false }: {
   decision: DecisionView; artifacts: ArtifactView[]; pending: boolean; connected: boolean;
-  onResolve: ResolveDecision; onSelectArtifact: (id: string) => void; sourceEnabled?: boolean; qualityEnabled?: boolean;
+  onResolve: ResolveDecision; onSelectArtifact: (id: string) => void;
+  sourceEnabled?: boolean; qualityEnabled?: boolean; deliveryEnabled?: boolean;
 }) {
   const [comment, setComment] = useState('');
   const [riskAccepted, setRiskAccepted] = useState(false);
@@ -142,6 +144,11 @@ export function DecisionCard({ decision, artifacts, pending, connected, onResolv
   const explanationMissing = uncertain && comment.trim().length < 10;
   const open = decision.status === 'open';
   const reconciliation = decision.blocking === false;
+  const approvalEffect = qualityEnabled
+    ? 'Backend и Frontend подготовят исходный код кандидата. Затем worker выполнит реальные проверки Python, HTTP и сборку, а QA сохранит отчёт. '
+      + (deliveryEnabled ? 'После успешного QA worker соберёт пакет, выполнит smoke, а DevOps сохранит инструкцию. Preview запускается по отдельной команде.' : 'Preview пока недоступен.')
+    : sourceEnabled ? 'Backend и Frontend подготовят исходный код кандидата. Проверки Runner доступны во вкладке «Проверки» после сохранения версии и подключения worker. QA и preview пока недоступны.'
+      : 'Разработка Clinic Demo на следующем этапе пока недоступна.';
   const choices = decision.choices.filter((choice): choice is DecisionResolution['choice'] => Object.hasOwn(choiceLabels, choice) && (!toolUncertain || choice === 'confirm_failed'));
   return <section className="decision-card" aria-label={decision.title} data-decision-id={decision.id} data-decision-version={decision.version}>
     <div className="decision-heading"><h3>{decision.title}</h3><span className="quiet-label">v{decision.version} · {open ? 'Ждёт ответа' : 'Решено'}</span></div>
@@ -156,10 +163,7 @@ export function DecisionCard({ decision, artifacts, pending, connected, onResolv
         : reconciliation ? <p className="decision-risk">Сверка предыдущей отправки не останавливает новую работу. Пауза и отмена ожидают известного исхода старой попытки. Подтверждайте отказ только при известном результате.</p>
         : uncertain ? <p className="decision-risk">Исход предыдущей отправки неизвестен. Повтор может создать дублирующий вызов и дополнительные расходы. Подтверждайте отказ только при известном результате.</p>
         : decision.kind === 'file_conflict' ? <p className="field-hint">Набор файлов не применён. Повтор получит актуальную основу и создаст новую попытку инженера.</p>
-        : <p className="field-hint">Принятие завершит оценку CTO без нового вызова провайдера. {sourceEnabled
-          ? qualityEnabled ? 'Backend и Frontend подготовят исходный код кандидата. Затем worker выполнит реальные проверки Python, HTTP и сборку, а QA сохранит отчёт. Preview пока недоступен.'
-            : 'Backend и Frontend подготовят исходный код кандидата. Проверки Runner доступны во вкладке «Проверки» после сохранения версии и подключения worker. QA и preview пока недоступны.'
-          : 'Разработка Clinic Demo на следующем этапе пока недоступна.'}</p>}
+        : <p className="field-hint">Принятие завершит оценку CTO без нового вызова провайдера. {approvalEffect}</p>}
       <label className="decision-comment"><span>{uncertain ? 'Объяснение · минимум 10 символов' : 'Комментарий к решению (необязательно)'}</span>
         <textarea value={comment} onChange={event => setComment(event.target.value)} rows={2} maxLength={4000} disabled={pending} />
       </label>

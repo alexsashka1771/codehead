@@ -8,6 +8,7 @@ export function CandidatePanel({ snapshot, onSelectArtifact, onSelectAttempt }: 
   snapshot: Snapshot | null; onSelectArtifact: (id: string) => void; onSelectAttempt: (id: string) => void;
 }) {
   const candidate = snapshot?.candidate;
+  const version = snapshot?.run.workflow_version;
   if (!candidate) return <div className="empty-state"><div><h3>Кандидат ещё не создан</h3><p>{snapshot?.run.workflow_version === 'clinic-v1'
     ? 'Запуск clinic-v1 сохраняет прежнюю границу PM → Architect → CTO. Исходный код кандидата в этой версии не создаётся.'
     : 'После принятия архитектуры Backend и Frontend сохранят исходные файлы и manifest кандидата.'}</p></div></div>;
@@ -15,7 +16,8 @@ export function CandidatePanel({ snapshot, onSelectArtifact, onSelectAttempt }: 
     onClick={() => onSelectArtifact(id)}>{label}</button>;
   return <section className="candidate-panel" aria-label="Сохранённый кандидат" data-candidate-id={candidate.id} data-candidate-revision={candidate.revision}>
     <div className="decision-heading"><h3>Clinic Demo · версия {candidate.revision}</h3><span className="quiet-label">{statusLabels[candidate.status]}</span></div>
-    <p className="field-hint">{snapshot?.run.workflow_version === 'clinic-v3' ? 'История QA доступна во вкладке «QA». Preview пока недоступен.' : 'QA и preview пока недоступны.'} Проверки Runner доступны во вкладке «Проверки» после сохранения версии и подключения worker.</p>
+    <p className="field-hint">{version === 'clinic-v4' ? 'История QA, проверенный пакет и локальная сессия доступны во вкладках «QA» и «Preview».'
+      : version === 'clinic-v3' ? 'История QA доступна во вкладке «QA». Preview пока недоступен.' : 'QA и preview пока недоступны.'} Проверки Runner доступны во вкладке «Проверки» после сохранения версии и подключения worker.</p>
     {candidate.blocked_reason ? <p className="attempt-error" role="status">{candidate.blocked_reason}</p> : null}
     <dl className="candidate-metadata">
       <div><dt>Профиль</dt><dd>{candidate.profile_version}</dd></div>

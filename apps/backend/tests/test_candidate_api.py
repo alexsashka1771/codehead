@@ -69,7 +69,7 @@ def test_source_content_is_returned_as_json_data_with_nosniff(client, prepared):
     assert response.headers["x-content-type-options"] == "nosniff"
 
 
-def test_capabilities_advertise_engineer_files_and_qa_without_preview(client, database):
+def test_capabilities_advertise_engineer_files_qa_and_preview_for_the_v4_worker(client, database):
     WorkerService(database).register("candidate-api-capabilities")
     response = client.get("/api/capabilities")
     assert response.status_code == 200
@@ -79,7 +79,7 @@ def test_capabilities_advertise_engineer_files_and_qa_without_preview(client, da
     assert "Backend" in capabilities["candidate_files"]["reason"]
     assert "Frontend" in capabilities["candidate_files"]["reason"]
     assert capabilities["qa_execution"]["status"] == "available"
-    assert capabilities["preview"]["status"] == "planned"
+    assert capabilities["delivery"]["status"] == capabilities["preview"]["status"] == "available"
     assert client.get("/health").json()["stage"] == "worker"
 
 
@@ -100,6 +100,7 @@ def test_legacy_worker_heartbeat_does_not_enable_engineer_file_generation(client
     assert capabilities["worker"]["status"] == "available"
     assert capabilities.get("candidate_files") is not None
     assert capabilities["candidate_files"]["status"] == "disabled"
+    assert capabilities["delivery"]["status"] == capabilities["preview"]["status"] == "disabled"
 
 
 def test_source_only_heartbeat_does_not_enable_the_initial_role_chain(client, database):
